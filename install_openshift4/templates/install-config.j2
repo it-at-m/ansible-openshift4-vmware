@@ -1,0 +1,57 @@
+apiVersion: v1
+baseDomain: {{ openshift_install_baseDomain }}
+compute:
+- architecture: amd64
+  hyperthreading: Enabled
+  name: worker
+  replicas: {{ openshift_install_worker }}
+  platform:
+    vsphere: 
+      cpus: 8
+      coresPerSocket: 2
+      memoryMB: 36864
+      osDisk:
+        diskSizeGB: 120
+controlPlane:
+  architecture: amd64
+  hyperthreading: Enabled
+  name: master
+  replicas: 3
+  platform:
+    vsphere: 
+      cpus: 8
+      coresPerSocket: 2
+      memoryMB: {{ master_memoryMB }}
+      osDisk:
+        diskSizeGB: 120
+metadata:
+  creationTimestamp: null
+  name: {{ cluster_id }}
+networking:
+  clusterNetwork:
+  - cidr: {{ cluster_network }}
+    hostPrefix: 23
+  machineNetwork:
+  - cidr: {{ machine_network }}
+  networkType: OpenShiftSDN
+  serviceNetwork:
+  - {{ service_network }}
+proxy:
+  httpProxy: {{ openshift_proxy }}
+  httpsProxy: {{ openshift_proxy }}
+  noProxy: {{ openshift_install_noProxy }}
+platform:
+  vsphere:
+    vCenter: {{ vcenter_url }}
+    username: {{ vcenter_username }}
+    password: {{ vcenter_password }}
+    datacenter: {{ vcenter_datacenter }}
+    defaultDatastore: {{ vcenter_defaultDatastore }}
+    diskType: thin
+    folder: {{ vcenter_folder }}
+    network: {{ vcenter_network }}
+    cluster: {{ vcenter_cluster }}
+    apiVIP: {{ vcenter_apiVIP }}
+    ingressVIP: {{ vcenter_ingressVIP }}
+pullSecret: {{ openshift_install_pullSecret }}
+{{ openshift_install_additionalTrustBundle }}

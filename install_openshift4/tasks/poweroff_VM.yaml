@@ -1,0 +1,27 @@
+- name: Execute only if "{{ item[0].guest_name }}" contains "{{ cluster_id }}" and "{{ infrastructure_id.stdout }}"
+  block:
+
+  - name: Shutdown VM "{{ item[0].guest_name }}"
+    vmware_guest:
+      hostname: "{{ vcenter_url }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      name: "{{ item[0].guest_name }}"
+      state: shutdownguest
+      state_change_timeout: 180
+    ignore_errors: yes
+    when: hard_power_off is undefined
+  
+  - name: Ensure VM "{{ item[0].guest_name }}" is powered off
+    vmware_guest:
+      hostname: "{{ vcenter_url }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      name: "{{ item[0].guest_name }}"
+      state: poweredoff
+      state_change_timeout: 60
+
+  when:
+    - ' cluster_id|string in item[0].guest_name '
+    - ' infrastructure_id.stdout in item[0].guest_name '
+    - ' item[1]|string in item[0].guest_name '

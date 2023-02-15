@@ -1,0 +1,30 @@
+- name: Execute only if "{{ item[0].guest_name }}" contains "{{ cluster_id }}" and "{{ infrastructure_id.stdout }}"
+  block:
+
+  - name: Power on VM "{{ item[0].guest_name }}" and wait for ip
+    vmware_guest:
+      hostname: "{{ vcenter_url }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      folder: "{{ vcenter_folder }}"
+      name: "{{ item[0].guest_name }}"
+      state: poweredon
+      state_change_timeout: 60
+      wait_for_ip_address: true
+    when: no_wait is undefined
+
+  - name: Power on VM "{{ item[0].guest_name }}"
+    vmware_guest:
+      hostname: "{{ vcenter_url }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      folder: "{{ vcenter_folder }}"
+      name: "{{ item[0].guest_name }}"
+      state: poweredon
+      state_change_timeout: 60
+    when: no_wait is defined
+
+  when:
+    - ' cluster_id|string in item[0].guest_name '
+    - ' infrastructure_id.stdout in item[0].guest_name '
+    - ' item[1]|string in item[0].guest_name '

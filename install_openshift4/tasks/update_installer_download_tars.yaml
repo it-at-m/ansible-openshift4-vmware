@@ -1,0 +1,32 @@
+- name: Check if a cached Version of {{ item }} exists
+  register: cachefile
+  stat:
+    path: "{{ openshift_install_directory }}/cached_{{ item }}-{{ openshift_version}}.tar.gz"
+
+- name: Download {{ item }} version {{ openshift_version }}
+  when: cachefile.stat.exists == False
+  become: true
+  get_url:
+    url: "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ openshift_version }}/{{ item }}-{{ openshift_version}}.tar.gz"
+    force: true # if previous download failed
+    checksum: "sha256:https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ openshift_version }}/sha256sum.txt"
+    use_proxy: yes
+    dest: "{{ openshift_install_directory }}"
+  environment:
+    https_proxy: "{{ openshift_proxy }}"
+
+- name: Mark file for further runs as successfully downloaded by changing its name
+  when: cachefile.stat.exists == False
+  become: true
+  copy:
+    remote_src: True
+    src: "{{ openshift_install_directory }}/{{ item }}-{{ openshift_version}}.tar.gz"
+    dest: "{{ openshift_install_directory }}/cached_{{ item }}-{{ openshift_version}}.tar.gz"
+    owner: root
+    group: "{{ file_group }}"
+
+- name: Make sure noncached version of (previously) downloaded files are absent
+  become: true
+  file:
+    path: "{{ openshift_install_directory }}/{{ item }}-{{ openshift_version}}.tar.gz"
+    state: absent

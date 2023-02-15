@@ -1,0 +1,54 @@
+﻿- name: Download oc
+  tags: download_oc
+  block:
+  - set_fact:
+      retry_counter: "{{ retry_counter|default(0)|int + 1 }}"
+
+
+  - name: Make sure install-archives are downloaded and cached
+    with_items:
+      - openshift-client-linux
+      - openshift-install-linux
+    include_tasks: update_installer_download_tars.yaml
+  
+  - name: Extract install files tar.gz into {{ openshift_install_directory }}
+    become: true
+    unarchive:
+      src: "{{ item }}"
+      dest: "{{ openshift_install_directory }}"
+    loop:
+      - "{{ openshift_install_directory }}/cached_openshift-client-linux-{{ openshift_version}}.tar.gz"
+      - "{{ openshift_install_directory }}/cached_openshift-install-linux-{{ openshift_version}}.tar.gz"
+
+  - name: Set symlink to extracted oc binary
+    become: true
+    file:
+      src: "{{ openshift_install_directory }}/oc"
+      dest: /usr/local/bin/oc
+      state: link
+
+  - name: Read oc bashcompletions
+    shell: oc completion bash
+    register: oc_bash_completion
+
+  - name: Write oc bashcompletions
+    become: true
+    copy:
+      content: "{{ oc_bash_completion.stdout }}"
+      dest: /etc/bash_completion.d/oc_bash_completion
+  
+  - set_fact:
+      retry_counter:
+
+  rescue:
+    - name: Pause for 10 seconds before retry
+      pause:
+        seconds: 10
+      when: retry_counter|int < include_max|default(3)|int
+
+    - include_tasks: main.yaml
+      when: retry_counter|int < include_max|default(3)|int
+      
+    - fail:
+        msg: Failed to meet conditional
+      when: retry_counter|int >= include_max|default(3)|int

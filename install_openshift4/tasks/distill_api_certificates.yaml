@@ -1,0 +1,26 @@
+- name: Make sure "{{ api_certificate_path | dirname }}" folder exists
+  become: true
+  file:
+    path: "{{ api_certificate_path | dirname }}"
+    state: directory
+    group: "{{ file_group }}"
+    mode: 0775
+
+- name: Create "{{ api_certificate_path | dirname }}/README.md"
+  become: true
+  copy:
+    src: api_cerfificates_README.md
+    dest: "{{ api_certificate_path | dirname }}/README.md"
+    mode: 0644
+
+- name: Extract api certificates
+  environment:
+    PATH_TO_KUBECONF: "{{ openshift_install_directory }}/{{cluster_id}}/auth/kubeconfig"
+  become: true
+  shell: 'grep certificate-authority-data: "$PATH_TO_KUBECONF" | cut -d ":" -f 2 | tr -d " " | base64 -d'
+  register: api_certificates
+
+- name: Write api certificates to "{{ api_certificate_path }}"
+  copy:
+    content: "{{ api_certificates.stdout }}"
+    dest: "{{ api_certificate_path }}"

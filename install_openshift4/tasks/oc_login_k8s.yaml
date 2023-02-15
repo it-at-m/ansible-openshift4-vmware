@@ -1,0 +1,37 @@
+- name: Check and touch KUBECONFIG, as runtime file, does not change the cluster
+  environment:
+    KUBECONFIG_EXPECTED: "{{ ansible_kubeconfig_path }}"
+    # KUBECONFIG environment needs to be defined on the playbook level to apply globaly!
+    # Do not define it here!
+  shell: |
+    if [ "$KUBECONFIG" != "$KUBECONFIG_EXPECTED" ]; then
+      echo "Unexpected KUBECONFIG definition!"
+      echo "'$KUBECONFIG' does mot match '$KUBECONFIG_EXPECTED'"
+      echo "Did you define this environment-variable on playbook-level?"
+      exit 1
+    fi
+    echo > "$KUBECONFIG" # Create an empty KUBECONFIG
+
+- name: ask for api token
+  pause:
+    prompt: "Bitte API token fuer Clusteranmeldung an \"{{ cluster_id }}\" eingeben"
+    echo: no
+  register: k8s_auth_api_key
+  no_log: true
+  when: token is not defined
+
+- name: trim token
+  set_fact:
+    k8s_auth_api_key:
+      user_input: "{{ k8s_auth_api_key.user_input | trim }}"
+  when: token is not defined
+
+- name: use token from commandline variable for api token
+  set_fact:
+    k8s_auth_api_key:
+      user_input: "{{ token }}"
+  when: token is defined
+
+- name: oc login, does not change the cluster
+  shell: |
+    oc login --token={{ k8s_auth_api_key.user_input }} --server={{ cluster_api }} --certificate-authority={{ api_certificate_path }}
