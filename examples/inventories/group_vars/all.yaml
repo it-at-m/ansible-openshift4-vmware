@@ -1,0 +1,69 @@
+---
+ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+ansible_kubeconfig_path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.kube/ansible_{{ cluster_id }}_config"
+
+cluster_admins:
+  - "jane.doe"
+  - "jon.doe"
+
+file_group: ateam
+
+openshift_proxy: http://192.0.2.100:80
+openshift_install_baseDomain: example.org
+openshift_install_noProxy: ".example.org"
+openshift_install_directory: /opt/openshift4
+
+cluster_network: 10.138.0.0/16
+service_network: 10.137.0.0/16
+
+vcenter_folder: /RZ/vm/OpenShift
+vcenter_datacenter: RZ
+vcenter_guestos: rhel8_64Guest
+vm_hardware_version: 18
+
+openshift_backup_path: /opt/backup
+api_certificate_path: /opt/api_certificates/{{ cluster_id }}
+
+openshift_install_additionalTrustBundle: |
+  additionalTrustBundle: |
+    -----BEGIN CERTIFICATE-----
+    yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+
+    -----END CERTIFICATE-----
+
+
+# redhat pullsecrets
+openshift_install_pullSecret: >
+    '{
+      "auths": {
+        "cloud.openshift.com": {
+          "auth": "{{ cloudopenshiftcom_quayio }}",
+          "email": "jane.doe@example.org"
+        },
+        "quay.io": {
+          "auth": "{{ cloudopenshiftcom_quayio }}",
+          "email": "jane.doe@example.org"
+        },
+        "registry.connect.redhat.com": {
+          "auth": "{{ registryconnectredhatcom_registryredhatio }}",
+          "email": "jane.doe@example.org"
+        },
+        "registry.redhat.io": {
+          "auth": "{{ registryconnectredhatcom_registryredhatio }}",
+          "email": "jane.doe@example.org"
+        }
+      }
+    }'
+
+
+vcenter_username : USER\svc-vmware-opesnhift
+# if vault_vcenter_password gets distinguished between clusters, use inventory 
+vcenter_password : !vault |
+    $ANSIBLE_VAULT;1.1;AES256
+    12341234123412341234123412341234123412341234123412341234123412341234123412341234
+
+
+## secret depot
+cloudopenshiftcom_quayio: !vault |
+    $ANSIBLE_VAULT;1.1;AES256
+    12341234123412341234123412341234123412341234123412341234123412341234123412341234
