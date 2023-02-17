@@ -6,6 +6,11 @@ Ansible Role for installing [Openshift with installer-provisioned installation (
 Currently supporting: [openshift_version: 4.11.16](examples/inventories/example-inventory.yaml#L5)
 
 
+## Similar Projects
+
+* https://github.com/sa-ne/openshift4-vmware-upi
+* https://github.com/noironetworks/openshift_vsphere_upi
+
 ## License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) file for more information.
