@@ -25,10 +25,8 @@ openshift_backup_path: /opt/backup
 api_certificate_path: /opt/api_certificates/{{ cluster_id }}
 
 openshift_install_additionalTrustBundle: |
-  additionalTrustBundle: |
     -----BEGIN CERTIFICATE-----
     yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
-
     -----END CERTIFICATE-----
 
 

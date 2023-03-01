@@ -54,4 +54,5 @@ platform:
     apiVIP: {{ vcenter_apiVIP }}
     ingressVIP: {{ vcenter_ingressVIP }}
 pullSecret: {{ openshift_install_pullSecret }}
-{{ openshift_install_additionalTrustBundle }}
+additionalTrustBundle: |
+{{ openshift_install_additionalTrustBundle | indent(2, True) }}
