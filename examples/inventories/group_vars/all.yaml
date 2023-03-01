@@ -24,6 +24,7 @@ vm_hardware_version: 18
 openshift_backup_path: /opt/backup
 api_certificate_path: /opt/api_certificates/{{ cluster_id }}
 
+# additional trusted CAs must be stored in .pem
 openshift_install_additionalTrustBundle: |
     -----BEGIN CERTIFICATE-----
     yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
