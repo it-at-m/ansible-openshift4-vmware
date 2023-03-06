@@ -1,0 +1,160 @@
+﻿- set_fact:
+    retry_counter: "{{ retry_counter|default(0)|int + 1 }}"
+  tags:
+    - stargate
+
+- block:
+
+  - name: Determine infrastructure_id
+    include_role:
+      name: determine_infrastructure_id
+      apply:
+        tags:
+          - stargate
+    tags:
+      - stargate
+
+  - set_fact:
+      worker_version: v1
+    tags:
+      - stargate
+
+  - name: remove resourcePool in MachineSet
+    k8s:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      definition:
+        apiVersion: machine.openshift.io/v1beta1
+        kind: MachineSet
+        metadata:
+          labels:
+            machine.openshift.io/cluster-api-cluster: "{{ infrastructure_id.stdout }}"
+          name: "{{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}" 
+          namespace: openshift-machine-api
+        spec:
+          template:
+            spec:
+              providerSpec:
+                value:
+                  workspace:
+                    resourcePool: null
+    loop: "{{ openshift_worker_nodes | dict2items | product(openshift_node_zones | dict2items) | list }}"
+    when:
+    - item[0].key != ''
+    - item[0].value != ''
+    ignore_errors: yes
+    tags:
+      - stargate
+  
+  - name: Create/modify MachineSet
+    k8s:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      definition: "{{ lookup('template', 'machine_set.j2') }}"
+    loop: "{{ openshift_worker_nodes | dict2items | product(openshift_node_zones | dict2items) | list }}"
+    when:
+    - item[0].key != ''
+    - item[0].value != ''
+    register: machineset
+    tags:
+      - stargate
+  
+  - name: Wait for nodes to get ready
+    k8s_info:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      api_version: machine.openshift.io/v1beta1
+      name: "{{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}"
+      namespace: openshift-machine-api
+      kind: MachineSet
+    register: machine_set
+    until: machine_set|json_query( 'resources[*].status.readyReplicas | [0]' )|int == item.0.value|int
+    retries: 60
+    delay: 10
+    loop: "{{ openshift_worker_nodes | dict2items | product(openshift_node_zones | dict2items) | list }}"
+    when:
+    - item.0.key != ''
+    - item.0.value != ''
+    tags:
+      - stargate
+  
+  - name: Scale down MachineSet "{{ infrastructure_id.stdout }}-worker" to 0
+    k8s:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      definition:
+        apiVersion: machine.openshift.io/v1beta1
+        kind: MachineSet
+        metadata:
+          name:  "{{ infrastructure_id.stdout }}-worker"
+          namespace: openshift-machine-api
+        spec:
+          replicas: 0
+      wait: true
+    tags:
+      - stargate
+  
+  - name: Get worker nodes
+    k8s_info:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      kind: Node
+    register: cluster_nodes
+    tags:
+      - stargate
+  
+  - name: Save worker node names to variable cluster_node_names
+    debug:
+      msg: "{{ cluster_nodes | json_query('resources[*].[metadata.name] | []')}}"
+    register: cluster_node_names
+    tags:
+      - stargate
+  
+  - name: set egress cidr to worker nodes
+    k8s:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      definition:
+        apiVersion: network.openshift.io/v1
+        kind: HostSubnet
+        metadata:
+          name: "{{ item }}"
+        egressCIDRs:
+        - "{{ machine_network }}"
+        host: "{{ item }}"
+    when:
+      - '"worker" in item'
+    with_items:
+      -  "{{ cluster_node_names.msg }}"
+    tags:
+      - stargate
+
+  - set_fact:
+      retry_counter:
+    tags:
+      - stargate
+
+  rescue:
+    - name: Pause for 10 seconds before retry
+      pause:
+        seconds: 10
+      when: retry_counter|int < include_max|default(3)|int
+      tags:
+        - stargate
+  
+    - include_tasks: main.yaml
+      when: retry_counter|int < include_max|default(3)|int
+      tags:
+        - stargate
+      
+    - fail:
+        msg: Failed to meet conditional
+      when: retry_counter|int >= include_max|default(3)|int
+      tags:
+        - stargate

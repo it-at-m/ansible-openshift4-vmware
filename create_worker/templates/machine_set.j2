@@ -1,0 +1,51 @@
+apiVersion: machine.openshift.io/v1beta1
+kind: MachineSet
+metadata:
+  labels:
+    machine.openshift.io/cluster-api-cluster: {{ infrastructure_id.stdout }}
+  name: {{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}
+  namespace: openshift-machine-api
+spec:
+  replicas: {{ item.0.value }}
+  selector:
+    matchLabels:
+      machine.openshift.io/cluster-api-cluster: {{ infrastructure_id.stdout }}
+      machine.openshift.io/cluster-api-machineset: {{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}
+  template:
+    metadata:
+      labels:
+        machine.openshift.io/cluster-api-cluster: {{ infrastructure_id.stdout }}
+        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-type: worker
+        machine.openshift.io/cluster-api-machineset: {{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}
+    spec:
+      metadata:
+        labels:
+          node-role.kubernetes.io/{{ item.0.key }}: "true"
+          topology.kubernetes.io/zone: "{{ item.1.key }}"
+      providerSpec:
+        value:
+          apiVersion: machine.openshift.io/v1beta1
+          credentialsSecret:
+            name: vsphere-cloud-credentials
+          diskGiB: 120
+          kind: VSphereMachineProviderSpec
+          memoryMiB: 36864
+          metadata:
+            creationTimestamp: null
+          network:
+            devices:
+            - networkName: {{ vcenter_network }}
+          numCPUs: 8
+          numCoresPerSocket: 2
+          snapshot: ""
+          template: {{ infrastructure_id.stdout }}-rhcos
+          userDataSecret:
+            name: worker-user-data
+          workspace:
+            datacenter: {{ vcenter_datacenter }}
+            datastore: {{ vcenter_defaultDatastore }}
+            folder: {{ vcenter_folder }}
+            resourcePool: /{{ vcenter_datacenter }}/host/{{ vcenter_cluster }}/Resources
+            server: {{ vcenter_url }}
+
