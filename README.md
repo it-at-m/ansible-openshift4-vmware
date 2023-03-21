@@ -8,8 +8,9 @@ Currently supporting: [openshift_version: 4.11.16](examples/inventories/example-
 
 ## Similar Projects
 
-* https://github.com/sa-ne/openshift4-vmware-upi
-* https://github.com/noironetworks/openshift_vsphere_upi
+* [github.com/sa-ne/openshift4-vmware-upi](https://github.com/sa-ne/openshift4-vmware-upi) Ansible Playbooks and Documentation to Support the Automated Installation of OpenShift 4 on VMware
+* [github.com/noironetworks/openshift_vsphere_upi](https://github.com/noironetworks/openshift_vsphere_upi) Ansible playbooks for installing Openshift on vSphere UPI with ACI-CNI plugin
+
 
 ## License
 
