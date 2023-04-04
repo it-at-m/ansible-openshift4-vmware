@@ -43,8 +43,8 @@ all:
       - "/share_capv4c/pv10g002c"
       - "/share_capv4c/pv50g003c"
     # Egress
-    #example reserve egress: #wilecoyote: 192.0.2.128
-    #example delete egress: egress_ips={ "wilecoyote" : "", "roadrunner-c" : "" }
+    # example reserve egress: #wilecoyote: 192.0.2.128
+    # example delete egress: egress_ips={ "wilecoyote" : "", "roadrunner-c" : "" }
     egress_ips:
       example: 192.0.2.128
       '#wilecoyote': 192.0.2.129
