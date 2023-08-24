@@ -171,6 +171,19 @@
           state: absent 
         become: true
 
+      - name: Remove directory /root/.cache/openshift-installer/image_cache
+        file:
+          path: "/root/.cache/openshift-installer/image_cache"
+          state: absent
+        become: true
+
+      - name: Create directory /root/.cache/openshift-installer/image_cache
+        file:
+          path: "/root/.cache/openshift-installer/image_cache"
+          state: directory
+          mode: '0755'
+        become: true
+
       - name: Download vsphere image "{{ vsphere_image_url.stdout }}"
         become: true
         get_url:
