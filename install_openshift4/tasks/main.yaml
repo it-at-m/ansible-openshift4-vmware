@@ -48,6 +48,15 @@
         path: "{{ ansible_kubeconfig_path }}"
       register: stat_ansible_kubeconfig_path
 
+    - name: Complain failed login
+      pause:
+        prompt: |
+          You provided an invalid token thus part of the deinstallation will not be performed.
+          If this happend unintended, abort the procedure here!
+          Otherwise hit enter to continue and perform the deinstallation manually afterwards.
+      when:
+        - stat_ansible_kubeconfig_path.stat.size | int <= 1
+
     - name: get all thin-csi PVCs
       k8s_info:
         api_key: "{{ k8s_auth_api_key.user_input }}"
