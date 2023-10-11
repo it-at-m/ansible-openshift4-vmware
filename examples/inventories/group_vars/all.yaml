@@ -55,6 +55,10 @@ openshift_install_pullSecret: >
     }'
 
 
+# auth entry for registry.connect.redhat.com/registry.redhat.io pullsecret
+registryconnectredhatcom_registryredhatio: "b3Blb="
+
+
 vcenter_username : USER\svc-vmware-opesnhift
 # if vault_vcenter_password gets distinguished between clusters, use inventory 
 vcenter_password : !vault |
