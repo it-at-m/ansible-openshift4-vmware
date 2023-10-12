@@ -81,7 +81,7 @@
     tags:
       - stargate
   
-  - name: Scale down MachineSet "{{ infrastructure_id.stdout }}-worker" to 0
+  - name: Remove MachineSet "{{ infrastructure_id.stdout }}-worker-0" on production
     k8s:
       api_key: "{{ k8s_auth_api_key.user_input }}"
       host: "{{ cluster_api }}"
