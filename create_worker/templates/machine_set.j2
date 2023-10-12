@@ -39,7 +39,7 @@ spec:
           numCPUs: 8
           numCoresPerSocket: 2
           snapshot: ""
-          template: {{ infrastructure_id.stdout }}-rhcos
+          template: {{ infrastructure_id.stdout }}-rhcos-{{ vcenter_region }}-{{ vcenter_zone }}
           userDataSecret:
             name: worker-user-data
           workspace:

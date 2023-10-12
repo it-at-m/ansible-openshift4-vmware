@@ -90,7 +90,7 @@
         apiVersion: machine.openshift.io/v1beta1
         kind: MachineSet
         metadata:
-          name:  "{{ infrastructure_id.stdout }}-worker"
+          name:  "{{ infrastructure_id.stdout }}-worker-0"
           namespace: openshift-machine-api
         spec:
           replicas: 0

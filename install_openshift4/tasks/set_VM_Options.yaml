@@ -13,14 +13,6 @@
     when:
       - ' "rhcos" in item[1]|string '
 
-  - name: Change VM "{{ item[0].guest_name }}" guest_id to "{{ vcenter_guestos }}"
-    vmware_guest:
-      hostname: "{{ vcenter_url }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      name: "{{ item[0].guest_name }}"
-      guest_id: "{{ vcenter_guestos }}"
-
   - name: Set VM hardware version to {{ vm_hardware_version }}
     vmware_guest:
       hostname: "{{ vcenter_url }}"
@@ -32,6 +24,14 @@
       name: "{{ item[0].guest_name }}"
       hardware:
         version: "{{ vm_hardware_version }}"
+
+  - name: Change VM "{{ item[0].guest_name }}" guest_id to "{{ vcenter_guestos }}"
+    vmware_guest:
+      hostname: "{{ vcenter_url }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      name: "{{ item[0].guest_name }}"
+      guest_id: "{{ vcenter_guestos }}"
 
   #set custom value ctkEnabled to rhcos VM template, so new nodes have ctkEnabled to avoid "CnsFault error: VSLM task failed" #2501 when a pod with thin-csi volumes is moved to a new node
   - name: set advanced settings ctkEnabled
