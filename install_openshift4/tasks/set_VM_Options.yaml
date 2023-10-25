@@ -1,60 +1,52 @@
-- name: Execute only if "{{ item[0].guest_name }}" contains "{{ cluster_id }}" and "{{ infrastructure_id.stdout }}"
-  block:
-
-  - name: Change rhcos template to VM
-    vmware_guest:
-      hostname: "{{ vcenter_url }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      datacenter: "{{ vcenter_datacenter }}"
-      datastore: "{{ vcenter_defaultDatastore }}"
-      cluster: "{{ vcenter_cluster }}"
-      name: "{{ item[0].guest_name }}"
-    when:
-      - ' "rhcos" in item[1]|string '
-
-  - name: Set VM hardware version to {{ vm_hardware_version }}
-    vmware_guest:
-      hostname: "{{ vcenter_url }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      datacenter: "{{ vcenter_datacenter }}"
-      datastore: "{{ vcenter_defaultDatastore }}"
-      cluster: "{{ vcenter_cluster }}"
-      name: "{{ item[0].guest_name }}"
-      hardware:
-        version: "{{ vm_hardware_version }}"
-
-  - name: Change VM "{{ item[0].guest_name }}" guest_id to "{{ vcenter_guestos }}"
-    vmware_guest:
-      hostname: "{{ vcenter_url }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      name: "{{ item[0].guest_name }}"
-      guest_id: "{{ vcenter_guestos }}"
-
-  #set custom value ctkEnabled to rhcos VM template, so new nodes have ctkEnabled to avoid "CnsFault error: VSLM task failed" #2501 when a pod with thin-csi volumes is moved to a new node
-  - name: set advanced settings ctkEnabled
-    vmware_guest:
-      hostname: "{{ vcenter_url }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      name: "{{ item[0].guest_name }}"
-      advanced_settings:
-        - key: "ctkEnabled"
-          value: "True"
-
-  - name: Change VM rhcos back to template
-    vmware_guest:
-      hostname: "{{ vcenter_url }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      name: "{{ item[0].guest_name }}"
-      is_template: yes
-    when:
-      - ' "rhcos" in item[1]|string '
-
+- name: Change rhcos template to VM
+  vmware_guest:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ vcenter_datacenter }}"
+    datastore: "{{ vcenter_defaultDatastore }}"
+    cluster: "{{ vcenter_cluster }}"
+    name: "{{ item }}"
   when:
-    - ' cluster_id|string in item[0].guest_name '
-    - ' infrastructure_id.stdout in item[0].guest_name '
-    - ' item[1]|string in item[0].guest_name '
+    - ' "rhcos" in item|string '
+
+- name: Set VM hardware version to {{ vm_hardware_version }}
+  vmware_guest:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    datacenter: "{{ vcenter_datacenter }}"
+    datastore: "{{ vcenter_defaultDatastore }}"
+    cluster: "{{ vcenter_cluster }}"
+    name: "{{ item }}"
+    hardware:
+      version: "{{ vm_hardware_version }}"
+
+- name: Change VM "{{ item }}" guest_id to "{{ vcenter_guestos }}"
+  vmware_guest:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    name: "{{ item }}"
+    guest_id: "{{ vcenter_guestos }}"
+
+#set custom value ctkEnabled to rhcos VM template, so new nodes have ctkEnabled to avoid "CnsFault error: VSLM task failed" #2501 when a pod with thin-csi volumes is moved to a new node
+- name: set advanced settings ctkEnabled
+  vmware_guest:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    name: "{{ item }}"
+    advanced_settings:
+      - key: "ctkEnabled"
+        value: "True"
+
+- name: Change VM rhcos back to template
+  vmware_guest:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    name: "{{ item }}"
+    is_template: yes
+  when:
+    - ' "rhcos" in item|string '
