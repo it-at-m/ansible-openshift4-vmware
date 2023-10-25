@@ -272,13 +272,15 @@
       password: "{{ vcenter_password }}"
       name: "{{ item }}"
       label: "Network adapter 1"
-      mac_address: "{{ vcenter_mac_address[ item ] }}"
+      mac_address: "{{ vcenter_mac_address[ item[1] ] }}"
       state: present
     when:
-      - ' "-bootstrap" in item ' or ' "-master-" in item '
-      - ' cluster_id|string in item '
-      - ' infrastructure_id.stdout in item '
-    loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+      - ' cluster_id|string in item[0].guest_name '
+      - ' infrastructure_id.stdout in item[0].guest_name '
+      - ' item[1]|string in item[0].guest_name '
+    with_nested:
+      - "{{ vm_list.virtual_machines }}"
+      - [ 'bootstrap', 'master-0', 'master-1', 'master-2' ]
 
   # loop over every VM in the cluster, one by one and execute include_tasks
   - include_tasks: set_VM_Options.yaml
