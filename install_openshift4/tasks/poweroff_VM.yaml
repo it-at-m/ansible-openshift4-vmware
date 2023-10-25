@@ -7,7 +7,9 @@
     state: shutdownguest
     state_change_timeout: 180
   ignore_errors: yes
-  when: hard_power_off is undefined
+  when: 
+    - hard_power_off is undefined
+    - ' "rhcos" not in item '
 
 - name: Ensure VM "{{ item }}" is powered off
   vmware_guest:
@@ -17,3 +19,5 @@
     name: "{{ item }}"
     state: poweredoff
     state_change_timeout: 60
+    when:
+      - ' "rhcos" not in item '

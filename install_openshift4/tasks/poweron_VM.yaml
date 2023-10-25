@@ -8,7 +8,9 @@
     state: poweredon
     state_change_timeout: 60
     wait_for_ip_address: true
-  when: no_wait is undefined
+  when: 
+    - no_wait is undefined
+    - ' "rhcos" not in item '
 
 - name: Power on VM "{{ item }}"
   vmware_guest:
@@ -19,4 +21,6 @@
     name: "{{ item }}"
     state: poweredon
     state_change_timeout: 60
-  when: no_wait is defined
+  when: 
+    - no_wait is defined
+    - ' "rhcos" not in item '
