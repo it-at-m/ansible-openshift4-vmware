@@ -270,7 +270,7 @@
       hostname: "{{ vcenter_url }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
-      name: "{{ item }}"
+      name: "{{ item[0].guest_name }}"
       label: "Network adapter 1"
       mac_address: "{{ vcenter_mac_address[ item[1] ] }}"
       state: present
