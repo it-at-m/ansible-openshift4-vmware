@@ -2,7 +2,7 @@ all:
   vars:
     openshift_master_cluster_public_hostname: openshift.example.org
     openshift_master_default_subdomain: apps.example.org
-    openshift_version: 4.11.26
+    openshift_version: 4.13.15
     external_registry: registry.example.org
     cluster_id: example
     favicon_path: /custom-logo
