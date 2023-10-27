@@ -3,7 +3,7 @@
 Ansible Role for installing [Openshift with installer-provisioned installation (ipi)](https://docs.openshift.com/container-platform/4.11/installing/installing_bare_metal_ipi/ipi-install-overview.html) on VMware.
 
 
-Currently supporting: [openshift_version: 4.11.26](examples/inventories/example-inventory.yaml#L5)
+Currently supporting: [openshift_version: 4.13](examples/inventories/example-inventory.yaml#L5)
 
 
 ## Similar Projects
