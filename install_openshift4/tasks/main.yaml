@@ -310,16 +310,16 @@
 
   - include_tasks: distill_api_certificates.yaml
 
+  - name: Get VM names of new cluster "{{ cluster_id }}" in vsphere folder "{{ vcenter_folder }}"
+    vmware_vm_info:
+      hostname: "{{ vcenter_url }}"
+      username: "{{ vcenter_username }}"
+      password: "{{ vcenter_password }}"
+      folder: "{{ vcenter_folder }}"
+    register: vm_list
+
   - name: Try to complete failed cluster "{{ cluster_id }}" install
     block:
-
-    - name: Get VM names of new cluster "{{ cluster_id }}" in vsphere folder "{{ vcenter_folder }}"
-      vmware_vm_info:
-        hostname: "{{ vcenter_url }}"
-        username: "{{ vcenter_username }}"
-        password: "{{ vcenter_password }}"
-        folder: "{{ vcenter_folder }}"
-      register: vm_list
 
     # loop over every VM in the cluster, one by one and execute include_tasks
     - include_tasks: poweroff_VM.yaml
