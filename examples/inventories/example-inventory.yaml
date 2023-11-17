@@ -22,16 +22,53 @@ all:
       "master-1"      : 00:00:00:00:00:03
       "master-2"      : 00:00:00:00:00:04
     cluster_api: https://api..example.org:6443
-    # You always get twice the pod count you select, because of replication
-    # example: openshift_worker_nodes={ "stargate" : "2", "holyplace" : "2" }
-    # you get 4 stargate worker and 4 holyplace worker, 2 per zone
+    # You always get twice the worker count you select, because of replication
+    # you get 2 stargate worker , 1 per zone
+    # when taint is set to "-" that means no taint for node
+    # "name:" and "role:" value must not be the same
+    # if role: "worker" is set, there will no own machineconfigpool
+    # example: 
+    # worker_1:
+    #    role: "worker"
+    #    name: "stargate"
+    #    version: v1
+    #    count: 1
+    #    cpu: 8
+    #    ram: 36864
+    #    disk: 120
+    #    taint: "-"
     openshift_worker_nodes:
-      stargate: 1
-      holyplace: 1
-    # Node label for the datacenters and their infra node replicas
+      worker_1:
+        role: "worker"
+        name: "stargate"
+        version: v1
+        count: 2
+        cpu: 8
+        ram: 36864
+        disk: 120
+        taint: "-"
+      worker_2:
+        role: "worker"
+        name: "holyplace"
+        version: v1
+        count: 2
+        cpu: 8
+        ram: 36864
+        disk: 120
+        taint: "-"
+      infra:
+        role: "infra"
+        name: "infra-nodes"
+        version: v1
+        count: 3
+        cpu: 12
+        ram: 65536
+        disk: 120
+        taint: "infra"
+    # Node label for the datacenters 
     openshift_node_zones:
-      a20: 1
-      k30: 3
+      a20:
+      k30:
     s3_imageregistry_bucket: int-capc-registry
     s3_imageregistry_endpoint: https://s3.example.org
     # NFS Storage

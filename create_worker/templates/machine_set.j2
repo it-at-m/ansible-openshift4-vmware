@@ -3,40 +3,55 @@ kind: MachineSet
 metadata:
   labels:
     machine.openshift.io/cluster-api-cluster: {{ infrastructure_id.stdout }}
-  name: {{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}
+{% if machineset_item.0.value.role == "infra" %}
+  name: {{ infrastructure_id.stdout }}-{{ machineset_item.0.value.role }}-{{ machineset_item.1.key }}-{{ machineset_item.0.value.version }}
+{% else %}
+  name: {{ infrastructure_id.stdout }}-{{ machineset_item.0.value.role }}-{{ machineset_item.0.value.name }}-{{ machineset_item.1.key }}-{{ machineset_item.0.value.version }}
+{% endif %}
   namespace: openshift-machine-api
 spec:
-  replicas: {{ item.0.value }}
+  replicas: {{ machineset_item.0.value.count }}
   selector:
     matchLabels:
       machine.openshift.io/cluster-api-cluster: {{ infrastructure_id.stdout }}
-      machine.openshift.io/cluster-api-machineset: {{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}
+{% if machineset_item.0.value.role == "infra" %}
+      machine.openshift.io/cluster-api-machineset: {{ infrastructure_id.stdout }}-{{ machineset_item.0.value.role }}-{{ machineset_item.1.key }}-{{ machineset_item.0.value.version }}
+{% else %}
+      machine.openshift.io/cluster-api-machineset: {{ infrastructure_id.stdout }}-{{ machineset_item.0.value.role }}-{{ machineset_item.0.value.name }}-{{ machineset_item.1.key }}-{{ machineset_item.0.value.version }}
+{% endif %}
   template:
     metadata:
       labels:
         machine.openshift.io/cluster-api-cluster: {{ infrastructure_id.stdout }}
-        machine.openshift.io/cluster-api-machine-role: worker
+        machine.openshift.io/cluster-api-machine-role: {{ machineset_item.0.value.role }}
         machine.openshift.io/cluster-api-machine-type: worker
-        machine.openshift.io/cluster-api-machineset: {{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}
+{% if machineset_item.0.value.role == "infra" %}
+        machine.openshift.io/cluster-api-machineset: {{ infrastructure_id.stdout }}-{{ machineset_item.0.value.role }}-{{ machineset_item.1.key }}-{{ machineset_item.0.value.version }}
+{% else %}
+        machine.openshift.io/cluster-api-machineset: {{ infrastructure_id.stdout }}-{{ machineset_item.0.value.role }}-{{ machineset_item.0.value.name }}-{{ machineset_item.1.key }}-{{ machineset_item.0.value.version }}
+{% endif %}
     spec:
       metadata:
         labels:
-          node-role.kubernetes.io/{{ item.0.key }}: "true"
-          topology.kubernetes.io/zone: "{{ item.1.key }}"
+{% if machineset_item.0.value.role != "infra" %}
+          node-role.kubernetes.io/{{ machineset_item.0.value.name }}: "true"
+{% endif %}
+          node-role.kubernetes.io/{{ machineset_item.0.value.role }}: ''
+          topology.kubernetes.io/zone: "{{ machineset_item.1.key }}"
       providerSpec:
         value:
           apiVersion: machine.openshift.io/v1beta1
           credentialsSecret:
             name: vsphere-cloud-credentials
-          diskGiB: 120
+          diskGiB: {{ machineset_item.0.value.disk }}
           kind: VSphereMachineProviderSpec
-          memoryMiB: 36864
+          memoryMiB: {{ machineset_item.0.value.ram }}
           metadata:
             creationTimestamp: null
           network:
             devices:
             - networkName: {{ vcenter_network }}
-          numCPUs: 8
+          numCPUs: {{ machineset_item.0.value.cpu }}
           numCoresPerSocket: 2
           snapshot: ""
           template: {{ infrastructure_id.stdout }}-rhcos-{{ vcenter_region }}-{{ vcenter_zone }}
@@ -48,4 +63,12 @@ spec:
             folder: {{ vcenter_folder }}
             resourcePool: /{{ vcenter_datacenter }}/host/{{ vcenter_cluster }}/Resources
             server: {{ vcenter_url }}
-
+{% if machineset_item.0.value.taint != "-" %}
+      taints:
+        - effect: NoSchedule
+          key: {{ machineset_item.0.value.taint }}
+          value: reserved
+        - effect: NoExecute
+          key: {{ machineset_item.0.value.taint }}
+          value: reserved
+{% endif %}

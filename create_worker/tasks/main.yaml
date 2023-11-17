@@ -1,7 +1,7 @@
 ﻿- set_fact:
     retry_counter: "{{ retry_counter|default(0)|int + 1 }}"
   tags:
-    - stargate
+    - create_worker
 
 - block:
 
@@ -10,16 +10,11 @@
       name: determine_infrastructure_id
       apply:
         tags:
-          - stargate
+          - create_worker
     tags:
-      - stargate
+      - create_worker
 
-  - set_fact:
-      worker_version: v1
-    tags:
-      - stargate
-
-  - name: remove resourcePool in MachineSet
+  - name: remove resourcePool in worker MachineSet
     k8s:
       api_key: "{{ k8s_auth_api_key.user_input }}"
       host: "{{ cluster_api }}"
@@ -30,7 +25,7 @@
         metadata:
           labels:
             machine.openshift.io/cluster-api-cluster: "{{ infrastructure_id.stdout }}"
-          name: "{{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}" 
+          name: "{{ infrastructure_id.stdout }}-{{ worker_machineset_item.0.value.role }}-{{ worker_machineset_item.0.value.name }}-{{ worker_machineset_item.1.key }}-{{ worker_machineset_item.0.value.version }}" 
           namespace: openshift-machine-api
         spec:
           template:
@@ -40,12 +35,46 @@
                   workspace:
                     resourcePool: null
     loop: "{{ openshift_worker_nodes | dict2items | product(openshift_node_zones | dict2items) | list }}"
+    loop_control:
+      loop_var: worker_machineset_item
     when:
-    - item[0].key != ''
-    - item[0].value != ''
+    - worker_machineset_item.0.key != ''
+    - worker_machineset_item.0.value != ''
+    - worker_machineset_item.0.value.role != 'infra'
     ignore_errors: yes
     tags:
-      - stargate
+      - create_worker
+
+  - name: remove resourcePool in infra MachineSet
+    k8s:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      definition:
+        apiVersion: machine.openshift.io/v1beta1
+        kind: MachineSet
+        metadata:
+          labels:
+            machine.openshift.io/cluster-api-cluster: "{{ infrastructure_id.stdout }}"
+          name: "{{ infrastructure_id.stdout }}-{{ infra_machineset_item.0.value.role }}-{{ infra_machineset_item.1.key }}-{{ infra_machineset_item.0.value.version }}" 
+          namespace: openshift-machine-api
+        spec:
+          template:
+            spec:
+              providerSpec:
+                value:
+                  workspace:
+                    resourcePool: null
+    loop: "{{ openshift_worker_nodes | dict2items | product(openshift_node_zones | dict2items) | list }}"
+    loop_control:
+      loop_var: infra_machineset_item
+    when:
+    - infra_machineset_item.0.key != ''
+    - infra_machineset_item.0.value != ''
+    - infra_machineset_item.0.value.role == 'infra'
+    ignore_errors: yes
+    tags:
+      - create_worker
   
   - name: Create/modify MachineSet
     k8s:
@@ -54,32 +83,74 @@
       ca_cert: "{{ api_certificate_path }}"
       definition: "{{ lookup('template', 'machine_set.j2') }}"
     loop: "{{ openshift_worker_nodes | dict2items | product(openshift_node_zones | dict2items) | list }}"
+    loop_control:
+      loop_var: machineset_item
     when:
-    - item[0].key != ''
-    - item[0].value != ''
+    - machineset_item[0].key != ''
+    - machineset_item[0].value != ''
     register: machineset
     tags:
-      - stargate
-  
+      - create_worker
+
+  - name: create MachineConfigPool for worker nodes
+    k8s:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      definition: "{{ lookup('template', 'machineconfigpool.j2') }}"
+    loop: "{{ openshift_worker_nodes | dict2items | product(openshift_node_zones | dict2items) | list }}"
+    loop_control:
+      loop_var: machineconfigpool_item
+    when: 
+      - machineconfigpool_item.0.value.role != 'worker'
+    tags:
+      - create_worker
+ 
   - name: Wait for nodes to get ready
     k8s_info:
       api_key: "{{ k8s_auth_api_key.user_input }}"
       host: "{{ cluster_api }}"
       ca_cert: "{{ api_certificate_path }}"
       api_version: machine.openshift.io/v1beta1
-      name: "{{ infrastructure_id.stdout }}-worker-{{ item.0.key }}-{{ item.1.key }}-{{ worker_version }}"
+      name: "{{ infrastructure_id.stdout }}-{{ worker_ready_item.0.value.role }}-{{ worker_ready_item.0.value.name }}-{{ worker_ready_item.1.key }}-{{ worker_ready_item.0.value.version }}"
       namespace: openshift-machine-api
       kind: MachineSet
     register: machine_set
-    until: machine_set|json_query( 'resources[*].status.readyReplicas | [0]' )|int == item.0.value|int
+    until: machine_set|json_query( 'resources[*].status.readyReplicas | [0]' )|int == worker_ready_item.0.value.count|int
     retries: 60
     delay: 10
     loop: "{{ openshift_worker_nodes | dict2items | product(openshift_node_zones | dict2items) | list }}"
+    loop_control:
+      loop_var: worker_ready_item
     when:
-    - item.0.key != ''
-    - item.0.value != ''
+    - worker_ready_item.0.key != ''
+    - worker_ready_item.0.value != ''
+    - worker_ready_item.0.value.role != 'infra'
     tags:
-      - stargate
+      - create_worker
+
+  - name: Wait for infra nodes to get ready
+    k8s_info:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      api_version: machine.openshift.io/v1beta1
+      name: "{{ infrastructure_id.stdout }}-{{ infra_ready_item.0.value.role }}-{{ infra_ready_item.1.key }}-{{ infra_ready_item.0.value.version }}"
+      namespace: openshift-machine-api
+      kind: MachineSet
+    register: machine_set
+    until: machine_set|json_query( 'resources[*].status.readyReplicas | [0]' )|int == infra_ready_item.0.value.count|int
+    retries: 60
+    delay: 10
+    loop: "{{ openshift_worker_nodes | dict2items | product(openshift_node_zones | dict2items) | list }}"
+    loop_control:
+      loop_var: infra_ready_item
+    when:
+    - infra_ready_item.0.key != ''
+    - infra_ready_item.0.value != ''
+    - infra_ready_item.0.value.role == 'infra'
+    tags:
+      - create_worker
   
   - name: Remove MachineSet "{{ infrastructure_id.stdout }}-worker-0" on production
     k8s:
@@ -96,7 +167,7 @@
       wait: true
     when: not (cluster_id == "capc" or cluster_id == "capktest")
     tags:
-      - stargate
+      - create_worker
   
   - name: Get worker nodes
     k8s_info:
@@ -106,14 +177,14 @@
       kind: Node
     register: cluster_nodes
     tags:
-      - stargate
+      - create_worker
   
   - name: Save worker node names to variable cluster_node_names
     debug:
       msg: "{{ cluster_nodes | json_query('resources[*].[metadata.name] | []')}}"
     register: cluster_node_names
     tags:
-      - stargate
+      - create_worker
   
   - name: set egress cidr to worker nodes
     k8s:
@@ -124,21 +195,22 @@
         apiVersion: network.openshift.io/v1
         kind: HostSubnet
         metadata:
-          name: "{{ item }}"
+          name: "{{ cidr_item }}"
         egressCIDRs:
         - "{{ machine_network }}"
-        host: "{{ item }}"
+        host: "{{ cidr_item }}"
     when:
-      - '"worker" in item'
-    with_items:
-      -  "{{ cluster_node_names.msg }}"
+      - '"worker" in cidr_item'
+    loop: "{{ cluster_node_names.msg|flatten(levels=1) }}"
+    loop_control:
+      loop_var: cidr_item
     tags:
-      - stargate
+      - create_worker
 
   - set_fact:
       retry_counter:
     tags:
-      - stargate
+      - create_worker
 
   rescue:
     - name: Pause for 10 seconds before retry
@@ -146,15 +218,15 @@
         seconds: 10
       when: retry_counter|int < include_max|default(3)|int
       tags:
-        - stargate
+        - create_worker
   
     - include_tasks: main.yaml
       when: retry_counter|int < include_max|default(3)|int
       tags:
-        - stargate
+        - create_worker
       
     - fail:
         msg: Failed to meet conditional
       when: retry_counter|int >= include_max|default(3)|int
       tags:
-        - stargate
+        - create_worker
