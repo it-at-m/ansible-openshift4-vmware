@@ -168,6 +168,24 @@
     when: not (cluster_id == "capc" or cluster_id == "capktest")
     tags:
       - create_worker
+
+  - name: Scale down MachineSet "{{ infrastructure_id.stdout }}-worker-0" to 0 on non-production
+    k8s:
+      api_key: "{{ k8s_auth_api_key.user_input }}"
+      host: "{{ cluster_api }}"
+      ca_cert: "{{ api_certificate_path }}"
+      definition:
+        apiVersion: machine.openshift.io/v1beta1
+        kind: MachineSet
+        metadata:
+          name:  "{{ infrastructure_id.stdout }}-worker-0"
+          namespace: openshift-machine-api
+        spec:
+          replicas: 0
+      wait: true
+    when: (cluster_id == "capc" or cluster_id == "capktest")
+    tags:
+      - create_worker
   
   - name: Get worker nodes
     k8s_info:
