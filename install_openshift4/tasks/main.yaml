@@ -213,7 +213,7 @@
   - name: Wait until rhcos ova image is uploaded to vsphere in {{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log (wait timeout 10 minutes)
     wait_for:
       path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-      search_regex: "vsphereprivate_import_ova.import...: Creation complete"
+      search_regex: "vsphereprivate_import_ova.import.*: Creation complete"
       timeout: 600
     become: true
 
