@@ -27,6 +27,15 @@
       dest: /usr/local/bin/oc
       state: link
 
+# Symlink kubectl to oc to get ansible module kubernetes.core.kustomize working
+  - name: Set symlink kubectl to extracted oc binary
+    become: true
+    file:
+      src: "{{ openshift_install_directory }}/oc"
+      dest: /usr/local/bin/kubectl
+      state: link
+
+
   - name: Read oc bashcompletions
     shell: oc completion bash
     register: oc_bash_completion
