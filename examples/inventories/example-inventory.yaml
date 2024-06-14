@@ -13,7 +13,9 @@ all:
     master_memoryMB: 36864
     machine_network: 192.0.2.0/24
     vcenter_url: vcenter.example.org
+    vcenter_datacenter: RZ
     vcenter_defaultDatastore: ds_xxxxxxxxxxx
+    vcenter_folder: /RZ/vm/OpenShift
     vcenter_network: yyyyyyyyyyyyyyy
     vcenter_cluster: zzzzzzzzzzzzzzzz
     vcenter_apiVIP: 192.0.2.10

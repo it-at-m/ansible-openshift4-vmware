@@ -14,8 +14,6 @@ openshift_install_directory: /opt/openshift4
 cluster_network: 10.138.0.0/16
 service_network: 10.137.0.0/16
 
-vcenter_folder: /RZ/vm/OpenShift
-vcenter_datacenter: RZ
 vcenter_guestos: rhel9_64Guest
 vcenter_region: sued
 vcenter_zone: zone1
