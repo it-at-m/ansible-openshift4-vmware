@@ -1,5 +1,7 @@
 all:
   vars:
+    openshift_install_baseDomain: example.org
+    openshift_install_noProxy: ".example.org"
     openshift_master_cluster_public_hostname: openshift.example.org
     openshift_master_default_subdomain: apps.example.org
     openshift_version: 4.13.15
