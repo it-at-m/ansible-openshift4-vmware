@@ -35,7 +35,7 @@ networking:
   - cidr: {{ machine_network }}
 {%- if cluster_id != "capw" and cluster_id != "capm" %}
   networkType: OpenShiftSDN
-{%- endif }
+{%- endif %}
   serviceNetwork:
   - {{ service_network }}
 proxy:
