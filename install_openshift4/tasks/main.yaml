@@ -139,6 +139,7 @@
       group: "{{ file_group }}"
       mode: '0660'
     become: true
+    when: (cluster_id != "capm") and (cluster_id != "capw")
 
   - name: Install new cluster "{{ cluster_id }}"
     shell: "{{ openshift_install_directory }}/openshift-install create cluster --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
