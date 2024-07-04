@@ -33,9 +33,9 @@ networking:
     hostPrefix: 23
   machineNetwork:
   - cidr: {{ machine_network }}
-{%- if cluster_id != "capw" and cluster_id != "capm" %}
+{% if openshift_sdn_network %}
   networkType: OpenShiftSDN
-{%- endif %}
+{% endif %}
   serviceNetwork:
   - {{ service_network }}
 proxy:

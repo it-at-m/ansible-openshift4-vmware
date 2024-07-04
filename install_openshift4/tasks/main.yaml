@@ -118,6 +118,11 @@
       mode: '2770'
     become: true
 
+  - name: define openshift_sdn_network variable with value false if not defined
+    set_fact:
+      openshift_sdn_network: false
+    when: openshift_sdn_network is not defined
+
   - name: Create "{{ openshift_install_directory }}/{{ cluster_id }}/install-config.yaml" from template
     template:
       src: install-config.j2
