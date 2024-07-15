@@ -305,12 +305,26 @@
       - ' node_type in item '
       - ' cluster_id in item '
       - ' infrastructure_id.stdout in item '
-   
-  - name: Starting at {{ ansible_date_time.iso8601 }} and wait until the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing (wait timeout 90 minutes)
+
+  - name: Waiting up to 1 hour for bootstrap to complete (until "{{ lookup('pipe', 'date -d "+1 hours" +"%R"') }}" )
+    wait_for:
+      path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+      search_regex: "Bootstrap status: complete"
+      timeout: 3600
+    become: true
+
+  - name: Waiting up to 40 minutes for the cluster to initialize (until "{{ lookup('pipe', 'date -d "+40 minutes" +"%R"') }}")
+    wait_for:
+      path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+      search_regex: "Cluster is initialized"
+      timeout: 2400
+    become: true
+ 
+  - name: Waiting until "{{ lookup('pipe', 'date -d "+30 minutes" +"%R"') }}" for the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing
     wait_for:
       path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
       search_regex: (kubeadmin|level=fatal)
-      timeout: 5400
+      timeout: 1800
     become: true
     register: string_found
 
@@ -373,12 +387,13 @@
       async: 2700
       poll: 0
 
-    - name: Starting at {{ ansible_date_time.iso8601 }} and wait until the string "kubeadmin" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing (wait timeout 45 minutes)
+    - name: Waiting until "{{ lookup('pipe', 'date -d "+30 minutes" +"%R"') }}" for the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing
       wait_for:
         path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-        search_regex: kubeadmin
-        timeout: 2700
+        search_regex: (kubeadmin|level=fatal)
+        timeout: 1800
       become: true
+      register: string_found
 
     when: string_found.match_groups[0] == "level=fatal"
 
