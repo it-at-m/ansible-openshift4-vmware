@@ -243,10 +243,24 @@
       name: "{{ bootstrap_vm.stdout }}"
       state: poweredoff
 
-  - name: Wait until master VMs are created (wait timeout 5 minutes)
+  - name: Wait until master 0 VM is created (wait timeout 5 minutes)
     wait_for:
       path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-      search_regex: "master.*: Creation complete"
+      search_regex: "master.0.: Creation complete"
+      timeout: 300
+    become: true
+
+  - name: Wait until master 1 VM is created (wait timeout 5 minutes)
+    wait_for:
+      path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+      search_regex: "master.1.: Creation complete"
+      timeout: 300
+    become: true
+
+  - name: Wait until master 2 VM is created (wait timeout 5 minutes)
+    wait_for:
+      path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+      search_regex: "master.2.: Creation complete"
       timeout: 300
     become: true
 
