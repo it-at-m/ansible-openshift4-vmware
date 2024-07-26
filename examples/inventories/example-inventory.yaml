@@ -10,7 +10,10 @@ all:
     favicon_path: /custom-logo
     openshift_install_worker: 3
     openshift_infra_cpus: 8
-    master_memoryMB: 36864
+    master_cpus: 4
+    master_memoryMB: 16384
+    worker_cpus: 4
+    worker_memoryMB: 16384
     machine_network: 192.0.2.0/24
     vcenter_url: vcenter.example.org
     vcenter_datacenter: RZ

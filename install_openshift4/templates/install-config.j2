@@ -7,9 +7,9 @@ compute:
   replicas: {{ openshift_install_worker }}
   platform:
     vsphere: 
-      cpus: 8
+      cpus: {{ worker_cpus }}
       coresPerSocket: 2
-      memoryMB: 36864
+      memoryMB: {{ worker_memoryMB }}
       osDisk:
         diskSizeGB: 120
 controlPlane:
@@ -19,7 +19,7 @@ controlPlane:
   replicas: 3
   platform:
     vsphere: 
-      cpus: 8
+      cpus: {{ master_cpus }}
       coresPerSocket: 2
       memoryMB: {{ master_memoryMB }}
       osDisk:
