@@ -10,6 +10,7 @@ all:
     favicon_path: /custom-logo
     openshift_install_worker: 3
     openshift_sdn_network: false
+    no_sealed_secret: true
     master_cpus: 4
     master_memoryMB: 16384
     worker_cpus: 4
