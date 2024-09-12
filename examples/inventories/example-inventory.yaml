@@ -9,7 +9,7 @@ all:
     cluster_id: example
     favicon_path: /custom-logo
     openshift_install_worker: 3
-    openshift_infra_cpus: 8
+    openshift_sdn_network: false
     master_cpus: 4
     master_memoryMB: 16384
     worker_cpus: 4
@@ -29,66 +29,3 @@ all:
       "master-1"      : 00:00:00:00:00:03
       "master-2"      : 00:00:00:00:00:04
     cluster_api: https://api..example.org:6443
-    # You always get twice the worker count you select, because of replication
-    # you get 2 stargate worker , 1 per zone
-    # when taint is set to "-" that means no taint for node
-    # "name:" and "role:" value must not be the same
-    # if role: "worker" is set, there will no own machineconfigpool
-    # example: 
-    # worker_1:
-    #    role: "worker"
-    #    name: "stargate"
-    #    version: v1
-    #    count: 1
-    #    cpu: 8
-    #    ram: 36864
-    #    disk: 120
-    #    taint: "-"
-    openshift_worker_nodes:
-      worker_1:
-        role: "worker"
-        name: "stargate"
-        version: v1
-        count: 2
-        cpu: 8
-        ram: 36864
-        disk: 120
-        taint: "-"
-      worker_2:
-        role: "worker"
-        name: "holyplace"
-        version: v1
-        count: 2
-        cpu: 8
-        ram: 36864
-        disk: 120
-        taint: "-"
-      infra:
-        role: "infra"
-        name: "infra-nodes"
-        version: v1
-        count: 3
-        cpu: 12
-        ram: 65536
-        disk: 120
-        taint: "infra"
-    # Node label for the datacenters 
-    openshift_node_zones:
-      a20:
-      k30:
-    s3_imageregistry_bucket: int-capc-registry
-    s3_imageregistry_endpoint: https://s3.example.org
-    # NFS Storage
-    nfs_storage_host: svm1234.example.org
-    ## must follow format: pv<SIZE>g<free_identifier>
-    ## /share_capv4x/ must be part of nfs_storage_directory, in case we have different directories /share_capv4c/pv10g002c and /share_capv8/pv50g002c
-    nfs_storage_directory:
-      - "/share_capv4c/pv10g001c"
-      - "/share_capv4c/pv10g002c"
-      - "/share_capv4c/pv50g003c"
-    # Egress
-    # example reserve egress: #wilecoyote: 192.0.2.128
-    # example delete egress: egress_ips={ "wilecoyote" : "", "roadrunner-c" : "" }
-    egress_ips:
-      example: 192.0.2.128
-      '#wilecoyote': 192.0.2.129

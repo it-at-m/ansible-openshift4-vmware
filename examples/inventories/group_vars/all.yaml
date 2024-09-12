@@ -2,10 +2,6 @@
 ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
 ansible_kubeconfig_path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.kube/ansible_{{ cluster_id }}_config"
 
-cluster_admins:
-  - "jane.doe"
-  - "jon.doe"
-
 file_group: ateam
 
 openshift_proxy: http://192.0.2.100:80
