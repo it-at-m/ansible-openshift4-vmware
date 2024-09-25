@@ -7,8 +7,6 @@ file_group: ateam
 openshift_proxy: http://192.0.2.100:80
 openshift_install_directory: /opt/openshift4
 
-cluster_network: 10.138.0.0/16
-service_network: 10.137.0.0/16
 
 vcenter_guestos: rhel9_64Guest
 vcenter_region: sued
