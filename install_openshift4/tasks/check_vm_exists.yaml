@@ -1,0 +1,23 @@
+- name: Wait until VM "{{ vm_name }}" exists in vsphere folder "{{ vcenter_folder }}" 
+  vmware_vm_info:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    folder: "{{ vcenter_folder }}"
+    vm_name: "{{ vm_name }}"
+  register: vm_check
+  retries: 60
+  delay: 3
+  until: vm_check.failed == false
+
+- name: Wait until VM "{{ vm_name }}" is in state "poweredOn"
+  vmware_vm_info:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    folder: "{{ vcenter_folder }}"
+    vm_name: "{{ vm_name }}"
+  register: vm_check
+  retries: 60
+  delay: 3
+  until: vm_check.virtual_machines[0].power_state == "poweredOn"

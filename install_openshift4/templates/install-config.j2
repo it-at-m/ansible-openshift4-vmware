@@ -48,6 +48,58 @@ platform:
       - {{ vcenter_apiVIP }}
     ingressVIPs:
       - {{ vcenter_ingressVIP }}
+{% if openshift_sdn_network == false %}
+    hosts:
+    - role: bootstrap
+      networkDevice: 
+        ipAddrs:
+        - {{ static_ip['bootstrap'] }}
+        gateway: {{ openshift_gateway }}
+        nameservers:
+        - {{ openshift_nameserver }}
+    - role: control-plane
+      networkDevice:
+        ipAddrs:
+        - {{ static_ip['master-0'] }}
+        gateway: {{ openshift_gateway }}
+        nameservers:
+        - {{ openshift_nameserver }}
+    - role: control-plane
+      networkDevice:
+        ipAddrs:
+        - {{ static_ip['master-1'] }}
+        gateway: {{ openshift_gateway }}
+        nameservers:
+        - {{ openshift_nameserver }}
+    - role: control-plane
+      networkDevice:
+        ipAddrs:
+        - {{ static_ip['master-2'] }}
+        gateway: {{ openshift_gateway }}
+        nameservers:
+        - {{ openshift_nameserver }}
+    - role: compute
+      networkDevice:
+        ipAddrs:
+        - {{ static_ip['worker-0'] }}
+        gateway: {{ openshift_gateway }}
+        nameservers:
+        - {{ openshift_nameserver }}
+    - role: compute
+      networkDevice:
+        ipAddrs:
+        - {{ static_ip['worker-1'] }}
+        gateway: {{ openshift_gateway }}
+        nameservers:
+        - {{ openshift_nameserver }}
+    - role: compute
+      networkDevice:
+        ipAddrs:
+        - {{ static_ip['worker-2'] }}
+        gateway: {{ openshift_gateway }}
+        nameservers:
+        - {{ openshift_nameserver }}
+{% endif %}
     failureDomains:
     - name: OpenShift_MIA
       region: {{ vcenter_region }}

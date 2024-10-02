@@ -34,7 +34,7 @@
 
     - name: Get infrastructure-id
       become: true
-      shell: grep cluster_id "{{ openshift_install_directory }}/{{ cluster_id }}"/terraform.tfvars.json | cut -d'"' -f4
+      shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
       register: infrastructure_id
 
     - name: Run role oc_login_k8s
@@ -153,14 +153,14 @@
     poll: 0
     register: openshift4_install
 
-  - name: Wait until the file "{{ openshift_install_directory }}/{{ cluster_id }}/terraform.tfvars.json" is present before continuing
+  - name: Wait until the file "{{ openshift_install_directory }}/{{ cluster_id }}/metadata.json" is present before continuing
     wait_for:
-      path: "{{ openshift_install_directory }}/{{ cluster_id }}/terraform.tfvars.json"
+      path: "{{ openshift_install_directory }}/{{ cluster_id }}/metadata.json"
     become: true
 
   - name: Get infrastructure-id
     become: true
-    shell: grep cluster_id "{{ openshift_install_directory }}/{{ cluster_id }}"/terraform.tfvars.json | cut -d'"' -f4
+    shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
     register: infrastructure_id
 
   - name: Wait until the string "The file was found in cache" or "failed to use cached vsphere image" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}"/.openshift_install.log (wait timeout 1 minute)
@@ -216,109 +216,10 @@
     when: rhcos_image_found.match_groups[0] == "failed to use cached vsphere image"
 
 
-  - name: Wait until rhcos ova image is uploaded to vsphere in {{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log (wait timeout 10 minutes)
-    wait_for:
-      path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-      search_regex: "vsphereprivate_import_ova.import.*: Creation complete"
-      timeout: 600
-    become: true
+  # set VMs MAC Adress on OpenShift SDN
+  - include_tasks: set_mac_address.yaml
+    when: openshift_sdn_network == true
 
-  - name: Get name of the bootstrap vm
-    shell: grep cluster_id "{{ openshift_install_directory }}/{{ cluster_id }}/terraform.tfvars.json" | cut -d'"' -f4 | sed s/$/-bootstrap/
-    become: true
-    register: bootstrap_vm
-
-  - name: Wait until bootstrap VM "{{ bootstrap_vm.stdout }}"  is created (wait timeout 10 minutes)
-    wait_for:
-      path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-      search_regex: "bootstrap.*: Creation complete"
-      timeout: 600
-    become: true
-
-  - name: Power off bootstrap VM "{{ bootstrap_vm.stdout }}"
-    vmware_guest:
-      hostname: "{{ vcenter_url }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      name: "{{ bootstrap_vm.stdout }}"
-      state: poweredoff
-
-  - name: Wait until master 0 VM is created (wait timeout 5 minutes)
-    wait_for:
-      path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-      search_regex: "master.0.: Creation complete"
-      timeout: 300
-    become: true
-
-  - name: Wait until master 1 VM is created (wait timeout 5 minutes)
-    wait_for:
-      path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-      search_regex: "master.1.: Creation complete"
-      timeout: 300
-    become: true
-
-  - name: Wait until master 2 VM is created (wait timeout 5 minutes)
-    wait_for:
-      path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-      search_regex: "master.2.: Creation complete"
-      timeout: 300
-    become: true
-
-  - name: Get VM names of new cluster "{{ cluster_id }}" in vsphere folder "{{ vcenter_folder }}"
-    vmware_vm_info:
-      hostname: "{{ vcenter_url }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      folder: "{{ vcenter_folder }}"
-    register: vm_list
-
-  - set_fact:
-      node_type: "{{ node_type | default('') }}"
-
-  # loop over every VM in the cluster, one by one and execute include_tasks
-  - include_tasks: poweroff_VM.yaml
-    loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
-    vars:
-      hard_power_off: yes
-    when:
-      - ' node_type in item '
-      - ' cluster_id in item '
-      - ' infrastructure_id.stdout in item '
-
-  - name: Change "{{ cluster_id }}" VMs mac address
-    vmware_guest_network:
-      hostname: "{{ vcenter_url }}"
-      username: "{{ vcenter_username }}"
-      password: "{{ vcenter_password }}"
-      name: "{{ item[0].guest_name }}"
-      label: "Network adapter 1"
-      mac_address: "{{ vcenter_mac_address[ item[1] ] }}"
-      state: present
-    when:
-      - ' cluster_id|string in item[0].guest_name '
-      - ' infrastructure_id.stdout in item[0].guest_name '
-      - ' item[1]|string in item[0].guest_name '
-    with_nested:
-      - "{{ vm_list.virtual_machines }}"
-      - [ 'bootstrap', 'master-0', 'master-1', 'master-2' ]
-
-  # loop over every VM in the cluster, one by one and execute include_tasks
-  - include_tasks: set_VM_Options.yaml
-    loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
-    when:
-      - ' node_type in item '
-      - ' cluster_id in item '
-      - ' infrastructure_id.stdout in item '
-
-  # loop over every VM in the cluster, one by one and execute include_tasks
-  - include_tasks: poweron_VM.yaml
-    loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
-    vars:
-      no_wait: yes
-    when:
-      - ' node_type in item '
-      - ' cluster_id in item '
-      - ' infrastructure_id.stdout in item '
 
   - name: Waiting up to 1 hour for bootstrap to complete (until "{{ lookup('pipe', 'date -d "+1 hours" +"%R"') }}" )
     wait_for:
