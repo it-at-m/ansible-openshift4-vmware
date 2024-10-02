@@ -16,6 +16,7 @@ all:
     worker_memoryMB: 16384
     machine_network: 192.0.2.0/24
     cluster_network: 10.138.0.0/16
+    cluster_network_hostprefix: 23
     service_network: 10.137.0.0/16
     vcenter_url: vcenter.example.org
     vcenter_datacenter: RZ
