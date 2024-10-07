@@ -1,0 +1,38 @@
+# Hierdurch wird das Problem mit dem ARP-Cache vorbeugend umgangen. Der Timer löscht alle 5 Minuten den ARP-Eintrag für openshift.capX.muenchen.de.
+#
+# https://git.muenchen.de/openshift/openshift-configs/-/wikis/LHM-Netzwerk#arp-cache-f%C3%BCr-openshiftcapxmuenchende-ist-auf-den-master-knoten-veraltet
+#
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: master
+  name: 99-cleanup-arp-cache
+spec:
+  config:
+    ignition:
+      version: 3.2.0
+    systemd:
+      units:
+      - contents: |
+          [Unit]
+          Description=Delete arp-entry for Openshift Ingress-VIP
+
+          [Timer]
+          OnCalendar=*-*-* *:00,05,10,15,20,25,30,35,40,45,50,55:00
+          Persistent=true
+
+          [Install]
+          WantedBy=timers.target
+        enabled: true
+        name: arp-cache-cleanup.timer
+      - contents: |
+          [Unit]
+          Description=Delete arp-entry for Openshift Ingress-VIP
+
+          [Service]
+          Type=oneshot
+          ExecStart=/sbin/arp -d {{ openshift_master_cluster_public_hostname }}
+
+        enabled: false
+        name: arp-cache-cleanup.service
