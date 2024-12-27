@@ -5,25 +5,11 @@ compute:
   hyperthreading: Enabled
   name: worker
   replicas: {{ openshift_install_worker }}
-  platform:
-    vsphere: 
-      cpus: {{ worker_cpus }}
-      coresPerSocket: 2
-      memoryMB: {{ worker_memoryMB }}
-      osDisk:
-        diskSizeGB: 120
 controlPlane:
   architecture: amd64
   hyperthreading: Enabled
   name: master
   replicas: 3
-  platform:
-    vsphere: 
-      cpus: {{ master_cpus }}
-      coresPerSocket: 2
-      memoryMB: {{ master_memoryMB }}
-      osDisk:
-        diskSizeGB: 120
 metadata:
   creationTimestamp: null
   name: {{ cluster_id }}
@@ -33,9 +19,7 @@ networking:
     hostPrefix: {{ cluster_network_hostprefix }}
   machineNetwork:
   - cidr: {{ machine_network }}
-{% if openshift_sdn_network %}
-  networkType: OpenShiftSDN
-{% endif %}
+  networkType: OVNKubernetes
   serviceNetwork:
   - {{ service_network }}
 proxy:
@@ -43,76 +27,11 @@ proxy:
   httpsProxy: {{ openshift_proxy }}
   noProxy: {{ openshift_install_noProxy }}
 platform:
-  vsphere:
+  baremetal:
     apiVIPs:
       - {{ vcenter_apiVIP }}
     ingressVIPs:
       - {{ vcenter_ingressVIP }}
-{% if openshift_sdn_network == false %}
-    hosts:
-    - role: bootstrap
-      networkDevice: 
-        ipAddrs:
-        - {{ static_ip['bootstrap'] }}
-        gateway: {{ openshift_gateway }}
-        nameservers: {{ openshift_nameservers }}
-    - role: control-plane
-      networkDevice:
-        ipAddrs:
-        - {{ static_ip['master-0'] }}
-        gateway: {{ openshift_gateway }}
-        nameservers: {{ openshift_nameservers }}
-    - role: control-plane
-      networkDevice:
-        ipAddrs:
-        - {{ static_ip['master-1'] }}
-        gateway: {{ openshift_gateway }}
-        nameservers: {{ openshift_nameservers }}
-    - role: control-plane
-      networkDevice:
-        ipAddrs:
-        - {{ static_ip['master-2'] }}
-        gateway: {{ openshift_gateway }}
-        nameservers: {{ openshift_nameservers }}
-    - role: compute
-      networkDevice:
-        ipAddrs:
-        - {{ static_ip['worker-0'] }}
-        gateway: {{ openshift_gateway }}
-        nameservers: {{ openshift_nameservers }}
-    - role: compute
-      networkDevice:
-        ipAddrs:
-        - {{ static_ip['worker-1'] }}
-        gateway: {{ openshift_gateway }}
-        nameservers: {{ openshift_nameservers }}
-    - role: compute
-      networkDevice:
-        ipAddrs:
-        - {{ static_ip['worker-2'] }}
-        gateway: {{ openshift_gateway }}
-        nameservers: {{ openshift_nameservers }}
-{% endif %}
-    failureDomains:
-    - name: OpenShift_MIA
-      region: {{ vcenter_region }}
-      server: {{ vcenter_url }}
-      topology:
-        computeCluster: "/{{ vcenter_datacenter }}/host/{{ vcenter_cluster }}"
-        datacenter: {{ vcenter_datacenter }}
-        datastore: "/{{ vcenter_datacenter }}/datastore/{{ vcenter_defaultDatastore }}"
-        networks:
-        - {{ vcenter_network }}
-        folder: "{{ vcenter_folder }}"
-      zone: {{ vcenter_zone }} 
-    vcenters:
-    - datacenters:
-      - {{ vcenter_datacenter }}
-      password: {{ vcenter_password }}
-      port: 443
-      server: {{ vcenter_url }}
-      user: {{ vcenter_username }}
-    diskType: thin
 pullSecret: {{ openshift_install_pullSecret }}
 sshKey: {{ sshKey }}
 additionalTrustBundle: |

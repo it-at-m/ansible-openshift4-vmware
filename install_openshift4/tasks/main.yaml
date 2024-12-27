@@ -1,41 +1,44 @@
 - name: Getting process IDs of openshift-install
+  register: pids_of_openshift_install
   pids:
       name: openshift-install
-  register: pids_of_openshift_install
 
 - name: Fail if openshift-install is already running
+  when: ( pids_of_openshift_install.pids != [] )
   fail:
     msg: Another openshift-install process is already running!!!
-  when: ( pids_of_openshift_install.pids != [] )
 
 - name: Check if old Cluster "{{ cluster_id }}" exists
+  register: stat_result
   stat:
     path: "{{ openshift_install_directory }}/{{ cluster_id }}"
-  register: stat_result
 
-- pause:
-    prompt: "Do you want to deinstall old cluster {{ cluster_id }} (yes/no)?"
-  register: deinstall_old_cluster
+- register: deinstall_old_cluster
   when: stat_result.stat.exists
+  pause:
+    prompt: "Do you want to deinstall old cluster {{ cluster_id }} (yes/no)?"
 
 - name: Fail if old cluster exists and should not be deleted
-  fail:
-    msg: Old cluster will not be deleted, failing!!!
   when:
     - stat_result.stat.exists 
     - not deinstall_old_cluster.user_input | bool
+  fail:
+    msg: Old cluster will not be deleted, failing!!!
 
 - name: Prepare openshift installer environment
   tags: download_oc
   include_tasks: update_installer.yaml
 
 - name: Deinstalling existing cluster "{{ cluster_id }}"
+  when:
+    - stat_result.stat.exists 
+    - deinstall_old_cluster.user_input | bool
   block:
 
     - name: Get infrastructure-id
       become: true
-      shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
       register: infrastructure_id
+      shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
 
     - name: Run role oc_login_k8s
       ansible.builtin.include_role:
@@ -44,34 +47,38 @@
           ignore_errors: yes
 
     - name: Check file size of "{{ ansible_kubeconfig_path }}"
+      register: stat_ansible_kubeconfig_path
       stat:
         path: "{{ ansible_kubeconfig_path }}"
-      register: stat_ansible_kubeconfig_path
 
     - name: Complain failed login
+      when:
+        - stat_ansible_kubeconfig_path.stat.size | int <= 1
       pause:
         prompt: |
           You provided an invalid token thus part of the deinstallation will not be performed.
           If this happend unintended, abort the procedure here!
           Otherwise hit enter to continue and perform the deinstallation manually afterwards.
-      when:
-        - stat_ansible_kubeconfig_path.stat.size | int <= 1
 
     - name: get all thin-csi PVCs
+      register: all_pvcs
+      when: k8s_auth_api_key.user_input is defined and stat_ansible_kubeconfig_path.stat.size | int > 1
       k8s_info:
         api_key: "{{ k8s_auth_api_key.user_input }}"
         host: "{{ cluster_api }}"
         ca_cert: "{{ api_certificate_path }}"
         api_version: v1
         kind: persistentvolumeclaims
-      register: all_pvcs
-      when: k8s_auth_api_key.user_input is defined and stat_ansible_kubeconfig_path.stat.size | int > 1
 
     - name: Remove old cluster
-      shell: "{{ openshift_install_directory }}/openshift-install destroy cluster --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
       become: true
+      shell: "{{ openshift_install_directory }}/openshift-install destroy cluster --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
 
     - name: delete all thin-csi PVCs
+      ignore_errors: yes
+      with_flattened:
+        - "{{  all_pvcs | json_query( 'resources[?spec.storageClassName==`thin-csi`].spec.volumeName' ) }}"
+      when: k8s_auth_api_key.user_input is defined and stat_ansible_kubeconfig_path.stat.size | int > 1
       community.vmware.vmware_first_class_disk:
         hostname: "{{ vcenter_url }}"
         username: "{{ vcenter_username }}"
@@ -79,10 +86,6 @@
         datastore_name: "{{ vcenter_defaultDatastore }}"
         disk_name: "{{ item }}"
         state: absent
-      ignore_errors: yes
-      with_flattened:
-        - "{{  all_pvcs | json_query( 'resources[?spec.storageClassName==`thin-csi`].spec.volumeName' ) }}"
-      when: k8s_auth_api_key.user_input is defined and stat_ansible_kubeconfig_path.stat.size | int > 1
 
     - name: delete vm storage policy
       community.vmware.vmware_vm_storage_policy:
@@ -94,264 +97,309 @@
         state: "absent"
 
     - name: Remove old install directory "{{ cluster_id }}"
+      become: true
       file:
         path: "{{ openshift_install_directory }}/{{ cluster_id }}"
         state: absent 
-      become: true
 
-  when:
-    - stat_result.stat.exists 
-    - deinstall_old_cluster.user_input | bool
 
 - name: Create new cluster "{{ cluster_id }}"
+  when: (not stat_result.stat.exists) or (deinstall_old_cluster.user_input | bool)
+  rescue:
+    - name: Pause for 10 seconds before retry
+      when: retry_counter|int < include_max|default(2)|int
+      pause:
+        seconds: 10
+
+    - name: include main task for retry
+      when: retry_counter|int < include_max|default(2)|int
+      include_tasks: main.yaml
+
+    - name: Getting process IDs of openshift-install
+      register: pids_of_openshift_install
+      pids:
+          name: openshift-install
+
+    - name: Kill openshift-install if it is still running
+      become: true
+      when: ( pids_of_openshift_install.pids != [] )
+      shell: pkill -f openshift-install
+
+    - name: fail installation
+      when: retry_counter|int >= include_max|default(3)|int
+      fail:
+        msg: Installation failed
   block:
 
   - set_fact:
       retry_counter: "{{ retry_counter|default(0)|int + 1 }}"
 
   - name: Create new install directory "{{ cluster_id }}"
+    become: true
     file:
       path: "{{ openshift_install_directory }}/{{ cluster_id }}"
       state: directory
       owner: root
       group: "{{ file_group }}"
       mode: '2770'
-    become: true
 
   - name: define openshift_sdn_network variable with value false if not defined
+    when: openshift_sdn_network is not defined
     set_fact:
       openshift_sdn_network: false
-    when: openshift_sdn_network is not defined
 
   - name: Create "{{ openshift_install_directory }}/{{ cluster_id }}/install-config.yaml" from template
+    become: true
     template:
       src: install-config.j2
       dest: "{{ openshift_install_directory }}/{{ cluster_id }}/install-config.yaml"
       owner: root
       group: "{{ file_group }}"
       mode: '0660'
-    become: true
 
-  - name: Create new cluster manifests for "{{ cluster_id }}"
-    shell: "{{ openshift_install_directory }}/openshift-install create manifests --dir={{ openshift_install_directory }}/{{ cluster_id }}"
+  - name: Create "{{ openshift_install_directory }}/{{ cluster_id }}/agent-config.yaml" from template
     become: true
+    template:
+      src: agent-config.j2
+      dest: "{{ openshift_install_directory }}/{{ cluster_id }}/agent-config.yaml"
+      owner: root
+      group: "{{ file_group }}"
+      mode: '0660'
+
+#  - name: Create new cluster manifests for "{{ cluster_id }}"
+#    become: true
+#    shell: "{{ openshift_install_directory }}/openshift-install create manifests --dir={{ openshift_install_directory }}/{{ cluster_id }}"
+
+  - name: Create "openshift" subdirectory
+    become: true
+    file:
+      path: "{{ openshift_install_directory }}/{{ cluster_id }}/openshift"
+      state: directory
+      owner: root
+      group: "{{ file_group }}"
+      mode: '2770'
 
   - name: Create "cluster-network-03-config.yml" from template for OpenShiftSDN in multitenant mode
+    become: true
+    when: openshift_sdn_network == true
     template:
       src: cluster-network-03-config.j2
       dest: "{{ openshift_install_directory }}/{{ cluster_id }}/manifests/cluster-network-03-config.yml"
       owner: root
       group: "{{ file_group }}"
       mode: '0660'
-    become: true
-    when: openshift_sdn_network == true
 
   - name: Create "99-cleanup-arp-cache.yaml" from template for arp cache cleanup
+    become: true
     template:
       src: 99-cleanup-arp-cache.j2
       dest: "{{ openshift_install_directory }}/{{ cluster_id }}/openshift/99-cleanup-arp-cache.yaml"
       owner: root
       group: "{{ file_group }}"
       mode: '0660'
-    become: true
 
   - name: Copy cluster configuration files to install openshift for static ip install
-    copy:
-      src: "{{ config_file }}"
-      dest: "{{ openshift_install_directory }}/{{ cluster_id }}/openshift/{{ config_file }}"
-      owner: root
-      group: "{{ file_group }}"
-      mode: '0660'
     become: true
     loop:
       - 99-master-chrony.yaml
     loop_control:
       loop_var: config_file
     when: openshift_sdn_network == false
+    copy:
+      src: "{{ config_file }}"
+      dest: "{{ openshift_install_directory }}/{{ cluster_id }}/openshift/{{ config_file }}"
+      owner: root
+      group: "{{ file_group }}"
+      mode: '0660'
+
+  - name: Pause for 1000 seconds before retry
+    pause:
+      seconds: 1000
 
   - name: Install new cluster "{{ cluster_id }}"
-    shell: "{{ openshift_install_directory }}/openshift-install create cluster --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
     become: true
     async: 5400
     poll: 0
     register: openshift4_install
+    shell: "{{ openshift_install_directory }}/openshift-install create cluster --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
 
   - name: Wait until the file "{{ openshift_install_directory }}/{{ cluster_id }}/metadata.json" is present before continuing
+    become: true
     wait_for:
       path: "{{ openshift_install_directory }}/{{ cluster_id }}/metadata.json"
-    become: true
 
   - name: Get infrastructure-id
     become: true
-    shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
     register: infrastructure_id
+    shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
 
   - name: Wait until the string "The file was found in cache" or "failed to use cached vsphere image" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}"/.openshift_install.log (wait timeout 1 minute)
+    become: true
+    register: rhcos_image_found
     wait_for:
       path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
       search_regex: (The file was found in cache|failed to use cached vsphere image)
       timeout: 60
-    become: true
-    register: rhcos_image_found
 
   - name: Get vsphere image url
+    become: true
+    register: vsphere_image_url
     shell:
       cmd: |
         grep 'failed to use cached vsphere image' "{{ openshift_install_directory }}/{{ cluster_id }}"/.openshift_install.log | cut -d'\' -f4 | sed s/\"//
-    become: true
-    register: vsphere_image_url
 
 
-  - block:
+  - name: cleanup and get new vsphere image if vsphere image not in cache
+    when: rhcos_image_found.match_groups[0] == "failed to use cached vsphere image"
+    block:
       - name: Remove old install directory "{{ cluster_id }}"
+        become: true
         file:
           path: "{{ openshift_install_directory }}/{{ cluster_id }}"
           state: absent 
-        become: true
 
       - name: Remove directory /root/.cache/openshift-installer/image_cache
+        become: true
         file:
           path: "/root/.cache/openshift-installer/image_cache"
           state: absent
-        become: true
 
       - name: Create directory /root/.cache/openshift-installer/image_cache
+        become: true
         file:
           path: "/root/.cache/openshift-installer/image_cache"
           state: directory
           mode: '0755'
-        become: true
 
       - name: Download vsphere image "{{ vsphere_image_url.stdout }}"
         become: true
+        environment:
+          https_proxy: "{{ openshift_proxy }}"
         get_url:
           url: "{{ vsphere_image_url.stdout }}"
           force: true # if previous download failed
           use_proxy: yes
           dest: "/root/.cache/openshift-installer/image_cache/"
-        environment:
-          https_proxy: "{{ openshift_proxy }}"
 
       - name: Fail and retry with new vsphere image as cache file
         ansible.builtin.fail:
           msg: Fail and retry with new vsphere image as cache file
 
-    when: rhcos_image_found.match_groups[0] == "failed to use cached vsphere image"
 
 
-  # set VMs MAC Adress on OpenShift SDN
-  - include_tasks: set_mac_address.yaml
+  - name: set VMs MAC Adress on OpenShift SDN
     when: openshift_sdn_network == true
+    include_tasks: set_mac_address.yaml
 
 
   - name: Waiting up to 1 hour for bootstrap to complete (until "{{ lookup('pipe', 'date -d "+1 hours" +"%R"') }}" )
+    become: true
     wait_for:
       path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
       search_regex: "Bootstrap status: complete"
       timeout: 3600
-    become: true
 
   - name: Waiting up to 40 minutes for the cluster to initialize (until "{{ lookup('pipe', 'date -d "+40 minutes" +"%R"') }}")
+    become: true
     wait_for:
       path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
       search_regex: "Cluster is initialized"
       timeout: 2400
-    become: true
  
   - name: Waiting until "{{ lookup('pipe', 'date -d "+30 minutes" +"%R"') }}" for the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing
+    become: true
+    register: string_found
     wait_for:
       path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
       search_regex: (kubeadmin|level=fatal)
       timeout: 1800
-    become: true
-    register: string_found
 
   - include_tasks: distill_api_certificates.yaml
 
   - name: Get VM names of new cluster "{{ cluster_id }}" in vsphere folder "{{ vcenter_folder }}"
+    register: vm_list
     vmware_vm_info:
       hostname: "{{ vcenter_url }}"
       username: "{{ vcenter_username }}"
       password: "{{ vcenter_password }}"
       folder: "{{ vcenter_folder }}"
-    register: vm_list
 
   - name: Try to complete failed cluster "{{ cluster_id }}" install
+    when: string_found.match_groups[0] == "level=fatal"
     block:
 
-    # loop over every VM in the cluster, one by one and execute include_tasks
-    - include_tasks: poweroff_VM.yaml
-      loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+    - name: loop over every VM in the cluster, one by one and execute include_tasks
       vars:
         hard_power_off: yes
       when:
         - ' "-worker-" in item '
         - ' cluster_id in item '
         - ' infrastructure_id.stdout in item '
-
-    # loop over every VM in the cluster, one by one and execute include_tasks
-    - include_tasks: poweroff_VM.yaml
       loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+      include_tasks: poweroff_VM.yaml
+
+    - name: loop over every VM in the cluster, one by one and execute include_tasks
       vars:
         hard_power_off: yes
       when:
         - ' "-master-" in item '
         - ' cluster_id in item '
         - ' infrastructure_id.stdout in item '
-
-    # loop over every VM in the cluster, one by one and execute include_tasks
-    - include_tasks: poweron_VM.yaml
       loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+      include_tasks: poweroff_VM.yaml
+
+    - name: loop over every VM in the cluster, one by one and execute include_tasks
       vars:
         no_wait: yes 
       when:
         - ' "-master-" in item '
         - ' cluster_id in item '
         - ' infrastructure_id.stdout in item '
-
-    # loop over every VM in the cluster, one by one and execute include_tasks
-    - include_tasks: poweron_VM.yaml
       loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+      include_tasks: poweron_VM.yaml
+
+    - name: loop over every VM in the cluster, one by one and execute include_tasks
       vars:
         no_wait: yes 
       when:
         - ' "-worker-" in item '
         - ' cluster_id in item '
         - ' infrastructure_id.stdout in item '
+      loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+      include_tasks: poweron_VM.yaml
  
     - name: Try to complete failed installation
-      shell: "{{ openshift_install_directory }}/openshift-install wait-for install-complete --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
       become: true
       async: 2700
       poll: 0
+      shell: "{{ openshift_install_directory }}/openshift-install wait-for install-complete --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
 
     - name: Waiting until "{{ lookup('pipe', 'date -d "+30 minutes" +"%R"') }}" for the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing
+      become: true
+      register: string_found
       wait_for:
         path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
         search_regex: (kubeadmin|level=fatal)
         timeout: 1800
-      become: true
-      register: string_found
 
-    when: string_found.match_groups[0] == "level=fatal"
 
   - name: Get kubeadmin password from log file
+    become: true
+    register: kubeadmin_password
     shell: 
       cmd: |
         grep kubeadmin "{{ openshift_install_directory }}/{{ cluster_id }}"/.openshift_install.log | cut -d'\' -f4 | sed s/\"// | tail -1
-    register: kubeadmin_password
-    become: true
 
   - name: oc login to "{{ cluster_api }}" with user "kubeadmin"
+    register: k8s_auth_results
+    until: k8s_auth_results.k8s_auth.api_key is defined
+    retries: 5
+    delay: 10
     k8s_auth:
       username: "kubeadmin"
       password: "{{ kubeadmin_password.stdout }}"
       host: "{{ cluster_api }}"
       ca_cert: "{{ api_certificate_path }}"
-    register: k8s_auth_results
-    until: k8s_auth_results.k8s_auth.api_key is defined
-    retries: 5
-    delay: 10
 
   - name: set k8s_auth_api_key.user_input
     set_fact: 
@@ -360,28 +408,3 @@
   - name: Perform central oc login command 
     shell: |
       oc login --token={{ k8s_auth_api_key.user_input }} --server={{ cluster_api }} --certificate-authority={{ api_certificate_path }}
-
-  rescue:
-    - name: Pause for 10 seconds before retry
-      pause:
-        seconds: 10
-      when: retry_counter|int < include_max|default(2)|int
-
-    - include_tasks: main.yaml
-      when: retry_counter|int < include_max|default(2)|int
-
-    - name: Getting process IDs of openshift-install
-      pids:
-          name: openshift-install
-      register: pids_of_openshift_install
-
-    - name: Kill openshift-install if it is still running
-      shell: pkill -f openshift-install
-      become: true
-      when: ( pids_of_openshift_install.pids != [] )
-
-    - fail:
-        msg: Installation failed
-      when: retry_counter|int >= include_max|default(3)|int
-
-  when: (not stat_result.stat.exists) or (deinstall_old_cluster.user_input | bool)
