@@ -2,8 +2,41 @@ apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
   name: {{ cluster_id }}
+{%- if openshift_sno is truthy(convert_bool=True) %}
+rendezvousIP: {{ static_network_part }}.127
+{%- else %}
 rendezvousIP: {{ static_network_part }}.10
+{% endif %}
 hosts:
+{%- if openshift_sno is truthy(convert_bool=True) %}
+  - hostname: master-0
+    role: master
+    interfaces:
+      - name: ens192
+        macAddress: {{ baremetal_mac_address["master-0"] }}
+    networkConfig:
+      interfaces:
+        - name: ens192
+          type: ethernet
+          state: up
+          mac-address: {{ baremetal_mac_address["master-0"] }}
+          ipv4:
+            enabled: true
+            address:
+              - ip: {{ static_network_part }}.127
+                prefix-length: {{ machine_network_hostprefix }} 
+            dhcp: false
+      dns-resolver:
+        config:
+          server: {{ openshift_nameservers }}
+      routes:
+        config:
+          - destination: 0.0.0.0/0
+            next-hop-address: {{ openshift_gateway }}
+            next-hop-interface: ens192
+            table-id: 254
+
+{%- else %}
   - hostname: master-0
     role: master
     interfaces:
@@ -97,3 +130,4 @@ hosts:
     interfaces:
       - name: ens192
         macAddress: {{ baremetal_mac_address["worker-2"] }}
+{%- endif %}
