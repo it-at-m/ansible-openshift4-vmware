@@ -338,7 +338,7 @@
     when: openshift_baremetal is truthy(convert_bool=True)
     block:
  
-   - name: wait to boot server from iso
+    - name: wait to boot server from iso
       pause:
         prompt: "Boot Server with created iso, then press button continue"
         echo: no

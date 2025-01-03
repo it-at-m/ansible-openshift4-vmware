@@ -4,7 +4,7 @@ compute:
 - architecture: amd64
   hyperthreading: Enabled
   name: worker
-  {%- if openshift_sno is truthy(convert_bool=True) %}
+  {%- if openshift_sno is truthy(convert_bool=True) or openshift_compact_cluster is truthy(convert_bool=True) %}
   replicas: 0
   {%- else %}
   replicas: 3

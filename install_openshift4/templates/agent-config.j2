@@ -115,6 +115,8 @@ hosts:
             next-hop-address: {{ openshift_gateway }}
             next-hop-interface: ens192
             table-id: 254
+{% endif %}
+{% if openshift_sno is not truthy(convert_bool=True) and openshift_compact_cluster is not truthy(convert_bool=True) %}
   - hostname: worker-0
     role: worker
     interfaces:
