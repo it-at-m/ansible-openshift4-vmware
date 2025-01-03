@@ -340,8 +340,8 @@
  
     - name: wait to boot server from iso
       pause:
-        prompt: "Boot Server with created iso, then press button continue"
-        echo: no
+        prompt: "Boot Server with created {{ openshift_install_directory }}/{{ cluster_id }}/agent.x86_64.iso", then press any key to continue"
+        echo: yes
 
     - name: Start wait for new baremetal cluster "{{ cluster_id }}" to install-complete
       become: true
