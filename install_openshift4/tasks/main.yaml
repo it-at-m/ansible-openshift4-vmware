@@ -340,7 +340,7 @@
  
     - name: wait to boot server from iso
       pause:
-        prompt: "Boot Server with created {{ openshift_install_directory }}/{{ cluster_id }}/agent.x86_64.iso", then press any key to continue"
+        prompt: "Boot Server with created {{ openshift_install_directory }}/{{ cluster_id }}/agent.x86_64.iso, then press any key to continue"
         echo: yes
 
     - name: Start wait for new baremetal cluster "{{ cluster_id }}" to install-complete
@@ -382,6 +382,7 @@
       vars:
         hard_power_off: yes
       when:
+        - openshift_baremetal is not truthy(convert_bool=True)
         - ' "-worker-" in item '
         - ' cluster_id in item '
         - ' infrastructure_id.stdout in item '
@@ -392,6 +393,7 @@
       vars:
         hard_power_off: yes
       when:
+        - openshift_baremetal is not truthy(convert_bool=True)
         - ' "-master-" in item '
         - ' cluster_id in item '
         - ' infrastructure_id.stdout in item '
@@ -402,6 +404,7 @@
       vars:
         no_wait: yes 
       when:
+        - openshift_baremetal is not truthy(convert_bool=True)
         - ' "-master-" in item '
         - ' cluster_id in item '
         - ' infrastructure_id.stdout in item '
@@ -412,6 +415,7 @@
       vars:
         no_wait: yes 
       when:
+        - openshift_baremetal is not truthy(convert_bool=True)
         - ' "-worker-" in item '
         - ' cluster_id in item '
         - ' infrastructure_id.stdout in item '

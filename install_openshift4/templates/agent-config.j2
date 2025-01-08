@@ -2,110 +2,63 @@ apiVersion: v1alpha1
 kind: AgentConfig
 metadata:
   name: {{ cluster_id }}
-{%- if openshift_sno is truthy(convert_bool=True) %}
-rendezvousIP: {{ static_network_part }}.127
-{%- else %}
-rendezvousIP: {{ static_network_part }}.10
-{% endif %}
+rendezvousIP: {{ baremetal_server[0].ip_address[0] }}
 hosts:
-{%- if openshift_sno is truthy(convert_bool=True) %}
-  - hostname: master-0
-    role: master
+{%- for server in baremetal_server %}
+  - hostname: {{ server.hostname }}
+    role: {{ server.role }}
     interfaces:
-      - name: ens192
-        macAddress: {{ baremetal_mac_address["master-0"] }}
+      {%- for interface in server.interfaces %}
+      - name: {{ interface.name }}
+        macAddress: {{ interface.macAddress }}
+      {%- endfor %}
     networkConfig:
       interfaces:
-        - name: ens192
+        {%- if baremetal_vlan is not defined %}
+        - name: eth0
           type: ethernet
           state: up
-          mac-address: {{ baremetal_mac_address["master-0"] }}
+          mac-address: {{ server.interfaces[0].macAddress }}
           ipv4:
             enabled: true
             address:
-              - ip: {{ static_network_part }}.127
-                prefix-length: {{ machine_network_hostprefix }} 
-            dhcp: false
-      dns-resolver:
-        config:
-          server: {{ openshift_nameservers }}
-      routes:
-        config:
-          - destination: 0.0.0.0/0
-            next-hop-address: {{ openshift_gateway }}
-            next-hop-interface: ens192
-            table-id: 254
-
-{%- else %}
-  - hostname: master-0
-    role: master
-    interfaces:
-      - name: ens192
-        macAddress: {{ baremetal_mac_address["master-0"] }}
-    networkConfig:
-      interfaces:
-        - name: ens192
-          type: ethernet
-          state: up
-          mac-address: {{ baremetal_mac_address["master-0"] }}
-          ipv4:
-            enabled: true
-            address:
-              - ip: {{ static_network_part }}.10
-                prefix-length: {{ machine_network_hostprefix }} 
-            dhcp: false
-      dns-resolver:
-        config:
-          server: {{ openshift_nameservers }}
-      routes:
-        config:
-          - destination: 0.0.0.0/0
-            next-hop-address: {{ openshift_gateway }}
-            next-hop-interface: ens192
-            table-id: 254
-  - hostname: master-1
-    role: master
-    interfaces:
-      - name: ens192
-        macAddress: {{ baremetal_mac_address["master-1"] }}
-    networkConfig:
-      interfaces:
-        - name: ens192
-          type: ethernet
-          state: up
-          mac-address: {{ baremetal_mac_address["master-1"] }}
-          ipv4:
-            enabled: true
-            address:
-              - ip: {{ static_network_part }}.11
+            {%- for server_ip in server.ip_address %}
+              - ip: {{ server_ip }}
                 prefix-length: {{ machine_network_hostprefix }}
+            {%- endfor %}
             dhcp: false
-      dns-resolver:
-        config:
-          server: {{ openshift_nameservers }}
-      routes:
-        config:
-          - destination: 0.0.0.0/0
-            next-hop-address: {{ openshift_gateway }}
-            next-hop-interface: ens192
-            table-id: 254
-  - hostname: master-2
-    role: master
-    interfaces:
-      - name: ens192
-        macAddress: {{ baremetal_mac_address["master-2"] }}
-    networkConfig:
-      interfaces:
-        - name: ens192
-          type: ethernet
+        {%- else %}
+        - name: bond0.{{ baremetal_vlan }}
+          type: vlan
           state: up
-          mac-address: {{ baremetal_mac_address["master-2"] }}
+          vlan:
+            base-iface: bond0
+            id: {{ baremetal_vlan }}
           ipv4:
             enabled: true
             address:
-              - ip: {{ static_network_part }}.12
-                prefix-length: {{ machine_network_hostprefix }} 
+            {%- for server_ip in server.ip_address %}
+              - ip: {{ server_ip }}
+                prefix-length: {{ machine_network_hostprefix }}
+            {%- endfor %}
             dhcp: false
+        - name: bond0
+          type: bond
+          state: up
+          mac-address: {{ server.interfaces[0].macAddress }}
+          ipv4:
+            enabled: false
+          ipv6:
+            enabled: false
+          link-aggregation:
+            mode: active-backup
+            options:
+              miimon: "150"
+            port:
+            {%- for interface in server.interfaces %}
+             - {{ interface.name }}
+            {%- endfor %}
+        {%- endif %}  
       dns-resolver:
         config:
           server: {{ openshift_nameservers }}
@@ -113,23 +66,10 @@ hosts:
         config:
           - destination: 0.0.0.0/0
             next-hop-address: {{ openshift_gateway }}
-            next-hop-interface: ens192
+            {%- if baremetal_vlan is not defined %}
+            next-hop-interface: eth0
+            {%- else %}
+            next-hop-interface: bond0.{{ baremetal_vlan }}
+            {%- endif %}
             table-id: 254
-{% endif %}
-{% if openshift_sno is not truthy(convert_bool=True) and openshift_compact_cluster is not truthy(convert_bool=True) %}
-  - hostname: worker-0
-    role: worker
-    interfaces:
-      - name: ens192
-        macAddress: {{ baremetal_mac_address["worker-0"] }}
-  - hostname: worker-1
-    role: worker
-    interfaces:
-      - name: ens192
-        macAddress: {{ baremetal_mac_address["worker-1"] }}
-  - hostname: worker-2
-    role: worker
-    interfaces:
-      - name: ens192
-        macAddress: {{ baremetal_mac_address["worker-2"] }}
-{%- endif %}
+{%- endfor %}
