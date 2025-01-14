@@ -1,0 +1,66 @@
+- name: Get infrastructure-id
+  become: true
+  register: infrastructure_id
+  shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
+
+- name: Run role oc_login_k8s
+  ansible.builtin.include_role:
+    name: oc_login_k8s
+    apply:
+      ignore_errors: yes
+
+- name: Check file size of "{{ ansible_kubeconfig_path }}"
+  register: stat_ansible_kubeconfig_path
+  stat:
+    path: "{{ ansible_kubeconfig_path }}"
+
+- name: Complain failed login
+  when:
+    - stat_ansible_kubeconfig_path.stat.size | int <= 1
+  pause:
+    prompt: |
+      You provided an invalid token thus part of the deinstallation will not be performed.
+      If this happend unintended, abort the procedure here!
+      Otherwise hit enter to continue and perform the deinstallation manually afterwards.
+
+- name: get all thin-csi PVCs
+  register: all_pvcs
+  when: k8s_auth_api_key.user_input is defined and stat_ansible_kubeconfig_path.stat.size | int > 1
+  k8s_info:
+    api_key: "{{ k8s_auth_api_key.user_input }}"
+    host: "{{ cluster_api }}"
+    ca_cert: "{{ api_certificate_path }}"
+    api_version: v1
+    kind: persistentvolumeclaims
+
+- name: Remove old cluster
+  become: true
+  shell: "{{ openshift_install_directory }}/openshift-install destroy cluster --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
+
+- name: delete all thin-csi PVCs
+  ignore_errors: yes
+  with_flattened:
+    - "{{  all_pvcs | json_query( 'resources[?spec.storageClassName==`thin-csi`].spec.volumeName' ) }}"
+  when: k8s_auth_api_key.user_input is defined and stat_ansible_kubeconfig_path.stat.size | int > 1
+  community.vmware.vmware_first_class_disk:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    datastore_name: "{{ vcenter_defaultDatastore }}"
+    disk_name: "{{ item }}"
+    state: absent
+
+- name: delete vm storage policy
+  community.vmware.vmware_vm_storage_policy:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    validate_certs: no
+    name: "openshift-storage-policy-{{ infrastructure_id.stdout }}"
+    state: "absent"
+
+- name: Remove old install directory "{{ cluster_id }}"
+  become: true
+  file:
+    path: "{{ openshift_install_directory }}/{{ cluster_id }}"
+    state: absent

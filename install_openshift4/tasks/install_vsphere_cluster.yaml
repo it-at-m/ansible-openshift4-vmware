@@ -1,0 +1,98 @@
+- name: Install new cluster "{{ cluster_id }}"
+  become: true
+  async: 5400
+  poll: 0
+  register: openshift4_install
+  shell: "{{ openshift_install_directory }}/openshift-install create cluster --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
+
+- name: Wait until the file "{{ openshift_install_directory }}/{{ cluster_id }}/metadata.json" is present before continuing
+  become: true
+  wait_for:
+    path: "{{ openshift_install_directory }}/{{ cluster_id }}/metadata.json"
+
+- name: Get infrastructure-id
+  become: true
+  register: infrastructure_id
+  shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
+
+- name: Wait until the string "The file was found in cache" or "failed to use cached vsphere image" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}"/.openshift_install.log (wait timeout 1 minute)
+  become: true
+  register: rhcos_image_found
+  wait_for:
+    path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+    search_regex: (The file was found in cache|failed to use cached vsphere image)
+    timeout: 60
+
+- name: Get vsphere image url
+  become: true
+  register: vsphere_image_url
+  shell:
+    cmd: |
+      grep 'failed to use cached vsphere image' "{{ openshift_install_directory }}/{{ cluster_id }}"/.openshift_install.log | cut -d'\' -f4 | sed s/\"//
+
+- name: cleanup and get new vsphere image if vsphere image not in cache
+  when: rhcos_image_found.match_groups[0] == "failed to use cached vsphere image"
+  block:
+    - name: Remove old install directory "{{ cluster_id }}"
+      become: true
+      file:
+        path: "{{ openshift_install_directory }}/{{ cluster_id }}"
+        state: absent
+
+    - name: Remove directory /root/.cache/openshift-installer/image_cache
+      become: true
+      file:
+        path: "/root/.cache/openshift-installer/image_cache"
+        state: absent
+
+    - name: Create directory /root/.cache/openshift-installer/image_cache
+      become: true
+      file:
+        path: "/root/.cache/openshift-installer/image_cache"
+        state: directory
+        mode: '0755'
+
+    - name: Download vsphere image "{{ vsphere_image_url.stdout }}"
+      become: true
+      environment:
+        https_proxy: "{{ openshift_proxy }}"
+      get_url:
+        url: "{{ vsphere_image_url.stdout }}"
+        force: true # if previous download failed
+        use_proxy: yes
+        dest: "/root/.cache/openshift-installer/image_cache/"
+
+    - name: Fail and retry with new vsphere image as cache file
+      ansible.builtin.fail:
+        msg: Fail and retry with new vsphere image as cache file
+
+- name: set VMs MAC Adress on OpenShift SDN
+  when: openshift_sdn_network == true
+  include_tasks: set_mac_address.yaml
+
+- name: Waiting up to 1 hour for bootstrap to complete (until "{{ lookup('pipe', 'date -d "+1 hours" +"%R"') }}" )
+  become: true
+  wait_for:
+    path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+    search_regex: "Bootstrap status: complete"
+    timeout: 3600
+
+- name: Waiting up to 40 minutes for the cluster to initialize (until "{{ lookup('pipe', 'date -d "+40 minutes" +"%R"') }}")
+  become: true
+  wait_for:
+    path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+    search_regex: "Cluster is initialized"
+    timeout: 2400
+
+- name: Waiting until "{{ lookup('pipe', 'date -d "+30 minutes" +"%R"') }}" for the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing
+  become: true
+  register: string_found
+  wait_for:
+    path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+    search_regex: (kubeadmin|level=fatal)
+    timeout: 1800
+
+- name: Try to complete failed vsphere installation
+  when:
+    - string_found.match_groups[0] == "level=fatal"
+  include_tasks: complete_failed_vsphere_install.yaml

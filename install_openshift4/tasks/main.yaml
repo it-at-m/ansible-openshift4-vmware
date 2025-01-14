@@ -14,91 +14,54 @@
     path: "{{ openshift_install_directory }}/{{ cluster_id }}"
 
 - register: deinstall_old_cluster
-  when: stat_result.stat.exists
+  when: 
+    - stat_result.stat.exists
+    - openshift_baremetal is not truthy(convert_bool=True)
   pause:
     prompt: "Do you want to deinstall old cluster {{ cluster_id }} (yes/no)?"
+
+- register: remove_old_cluster_config
+  when: 
+    - stat_result.stat.exists
+    - openshift_baremetal is truthy(convert_bool=True)
+  pause:
+    prompt: "Do you want to remove configuration of cluster {{ cluster_id }} (yes/no)?"
 
 - name: Fail if old cluster exists and should not be deleted
   when:
     - stat_result.stat.exists 
-    - not deinstall_old_cluster.user_input | bool
+    - openshift_baremetal is not truthy(convert_bool=True)
+    - not deinstall_old_cluster.user_input | bool 
   fail:
     msg: Old cluster will not be deleted, failing!!!
+
+- name: Fail if old cluster config exists and should not be deleted
+  when:
+    - stat_result.stat.exists 
+    - openshift_baremetal is truthy(convert_bool=True)
+    - not remove_old_cluster_config.user_input | bool 
+  fail:
+    msg: Old cluster config will not be deleted, failing!!!
 
 - name: Prepare openshift installer environment
   tags: download_oc
   include_tasks: update_installer.yaml
 
-- name: Deinstalling existing cluster "{{ cluster_id }}"
+- name: Deinstalling existing vsphere cluster "{{ cluster_id }}"
   when:
     - stat_result.stat.exists 
+    - deinstall_old_cluster.user_input is defined
     - deinstall_old_cluster.user_input | bool
+    - openshift_baremetal is not truthy(convert_bool=True)
+  include_tasks: deinstall_vsphere_cluster.yaml
+
+- name: Remove existing configurations of baremetal cluster "{{ cluster_id }}"
+  when:
+    - stat_result.stat.exists
+    - remove_old_cluster_config is defined
+    - remove_old_cluster_config.user_input | bool
+    - openshift_baremetal is truthy(convert_bool=True)
   block:
-
-  - name: Cleanup vsphere cluster
-    when: openshift_baremetal is not truthy(convert_bool=True)
-    block:
-
-    - name: Get infrastructure-id
-      become: true
-      register: infrastructure_id
-      shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
-
-    - name: Run role oc_login_k8s
-      ansible.builtin.include_role:
-        name: oc_login_k8s
-        apply:
-          ignore_errors: yes
-
-    - name: Check file size of "{{ ansible_kubeconfig_path }}"
-      register: stat_ansible_kubeconfig_path
-      stat:
-        path: "{{ ansible_kubeconfig_path }}"
-
-    - name: Complain failed login
-      when:
-        - stat_ansible_kubeconfig_path.stat.size | int <= 1
-      pause:
-        prompt: |
-          You provided an invalid token thus part of the deinstallation will not be performed.
-          If this happend unintended, abort the procedure here!
-          Otherwise hit enter to continue and perform the deinstallation manually afterwards.
-
-    - name: get all thin-csi PVCs
-      register: all_pvcs
-      when: k8s_auth_api_key.user_input is defined and stat_ansible_kubeconfig_path.stat.size | int > 1
-      k8s_info:
-        api_key: "{{ k8s_auth_api_key.user_input }}"
-        host: "{{ cluster_api }}"
-        ca_cert: "{{ api_certificate_path }}"
-        api_version: v1
-        kind: persistentvolumeclaims
-
-    - name: Remove old cluster
-      become: true
-      shell: "{{ openshift_install_directory }}/openshift-install destroy cluster --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
-
-    - name: delete all thin-csi PVCs
-      ignore_errors: yes
-      with_flattened:
-        - "{{  all_pvcs | json_query( 'resources[?spec.storageClassName==`thin-csi`].spec.volumeName' ) }}"
-      when: k8s_auth_api_key.user_input is defined and stat_ansible_kubeconfig_path.stat.size | int > 1
-      community.vmware.vmware_first_class_disk:
-        hostname: "{{ vcenter_url }}"
-        username: "{{ vcenter_username }}"
-        password: "{{ vcenter_password }}"
-        datastore_name: "{{ vcenter_defaultDatastore }}"
-        disk_name: "{{ item }}"
-        state: absent
-
-    - name: delete vm storage policy
-      community.vmware.vmware_vm_storage_policy:
-        hostname: "{{ vcenter_url }}"
-        username: "{{ vcenter_username }}"
-        password: "{{ vcenter_password }}"
-        validate_certs: no
-        name: "openshift-storage-policy-{{ infrastructure_id.stdout }}"
-        state: "absent"
 
   - name: Remove old install directory "{{ cluster_id }}"
     become: true
@@ -106,9 +69,9 @@
       path: "{{ openshift_install_directory }}/{{ cluster_id }}"
       state: absent 
 
-
 - name: Create new cluster "{{ cluster_id }}"
-  when: (not stat_result.stat.exists) or (deinstall_old_cluster.user_input | bool)
+  when: 
+    - (not stat_result.stat.exists) or ( openshift_baremetal is not truthy(convert_bool=True) and (deinstall_old_cluster.user_input | bool) ) or ( openshift_baremetal is truthy(convert_bool=True) and ( remove_old_cluster_config.user_input | bool ) )
   rescue:
     - name: Pause for 10 seconds before retry
       when: retry_counter|int < include_max|default(2)|int
@@ -146,11 +109,6 @@
       owner: root
       group: "{{ file_group }}"
       mode: '2770'
-
-  - name: define openshift_sdn_network variable with value false if not defined
-    when: openshift_sdn_network is not defined
-    set_fact:
-      openshift_sdn_network: false
 
   - name: Create "{{ openshift_install_directory }}/{{ cluster_id }}/install-config.yaml" from template
     become: true
@@ -230,213 +188,16 @@
     register: openshift4_install
     shell: "{{ openshift_install_directory }}/openshift-install agent create image --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
 
-  - name: block for vsphere install
+  - name: Install vsphere cluster
     when: openshift_baremetal is not truthy(convert_bool=True)
-    block:
+    include_tasks: install_vsphere_cluster.yaml
 
-    - name: Install new cluster "{{ cluster_id }}"
-      become: true
-      async: 5400
-      poll: 0
-      register: openshift4_install
-      shell: "{{ openshift_install_directory }}/openshift-install create cluster --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
-  
-    - name: Wait until the file "{{ openshift_install_directory }}/{{ cluster_id }}/metadata.json" is present before continuing
-      become: true
-      wait_for:
-        path: "{{ openshift_install_directory }}/{{ cluster_id }}/metadata.json"
-  
-    - name: Get infrastructure-id
-      become: true
-      register: infrastructure_id
-      shell: grep -o -m1 "{{ cluster_id }}-.\{5\}" "{{ openshift_install_directory }}/{{ cluster_id }}"/metadata.json
-  
-    - name: Wait until the string "The file was found in cache" or "failed to use cached vsphere image" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}"/.openshift_install.log (wait timeout 1 minute)
-      become: true
-      register: rhcos_image_found
-      wait_for:
-        path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-        search_regex: (The file was found in cache|failed to use cached vsphere image)
-        timeout: 60
-  
-    - name: Get vsphere image url
-      become: true
-      register: vsphere_image_url
-      shell:
-        cmd: |
-          grep 'failed to use cached vsphere image' "{{ openshift_install_directory }}/{{ cluster_id }}"/.openshift_install.log | cut -d'\' -f4 | sed s/\"//
-  
-  
-    - name: cleanup and get new vsphere image if vsphere image not in cache
-      when: rhcos_image_found.match_groups[0] == "failed to use cached vsphere image"
-      block:
-        - name: Remove old install directory "{{ cluster_id }}"
-          become: true
-          file:
-            path: "{{ openshift_install_directory }}/{{ cluster_id }}"
-            state: absent 
-  
-        - name: Remove directory /root/.cache/openshift-installer/image_cache
-          become: true
-          file:
-            path: "/root/.cache/openshift-installer/image_cache"
-            state: absent
-  
-        - name: Create directory /root/.cache/openshift-installer/image_cache
-          become: true
-          file:
-            path: "/root/.cache/openshift-installer/image_cache"
-            state: directory
-            mode: '0755'
-  
-        - name: Download vsphere image "{{ vsphere_image_url.stdout }}"
-          become: true
-          environment:
-            https_proxy: "{{ openshift_proxy }}"
-          get_url:
-            url: "{{ vsphere_image_url.stdout }}"
-            force: true # if previous download failed
-            use_proxy: yes
-            dest: "/root/.cache/openshift-installer/image_cache/"
-  
-        - name: Fail and retry with new vsphere image as cache file
-          ansible.builtin.fail:
-            msg: Fail and retry with new vsphere image as cache file
-  
-  
-  
-    - name: set VMs MAC Adress on OpenShift SDN
-      when: openshift_sdn_network == true
-      include_tasks: set_mac_address.yaml
-  
-  
-    - name: Waiting up to 1 hour for bootstrap to complete (until "{{ lookup('pipe', 'date -d "+1 hours" +"%R"') }}" )
-      become: true
-      wait_for:
-        path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-        search_regex: "Bootstrap status: complete"
-        timeout: 3600
-  
-    - name: Waiting up to 40 minutes for the cluster to initialize (until "{{ lookup('pipe', 'date -d "+40 minutes" +"%R"') }}")
-      become: true
-      wait_for:
-        path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-        search_regex: "Cluster is initialized"
-        timeout: 2400
-   
-    - name: Waiting until "{{ lookup('pipe', 'date -d "+30 minutes" +"%R"') }}" for the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing
-      become: true
-      register: string_found
-      wait_for:
-        path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-        search_regex: (kubeadmin|level=fatal)
-        timeout: 1800
+  - name: Install baremetal cluster
+    when: openshift_baremetal is truthy(convert_bool=True)
+    include_tasks: install_baremetal_cluster.yaml
 
   - include_tasks: distill_api_certificates.yaml
-
-  - name: Check for baremetal install
-    when: openshift_baremetal is truthy(convert_bool=True)
-    block:
  
-    - name: wait to boot server from iso
-      pause:
-        prompt: "Boot Server with created {{ openshift_install_directory }}/{{ cluster_id }}/agent.x86_64.iso, then press any key to continue"
-        echo: yes
-
-    - name: Start wait for new baremetal cluster "{{ cluster_id }}" to install-complete
-      become: true
-      async: 5400
-      poll: 0
-      shell: "{{ openshift_install_directory }}/openshift-install agent wait-for install-complete --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
-
-    - name: Waiting up to 1 hour for bootstrap to complete (until "{{ lookup('pipe', 'date -d "+1 hours" +"%R"') }}" )
-      become: true
-      wait_for:
-        path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-        search_regex: "Bootstrap is complete"
-        timeout: 3600
-
-    - name: Waiting up to 2 hours for cluster to install (until "{{ lookup('pipe', 'date -d "+2 hours" +"%R"') }}" )
-      become: true
-      wait_for:
-        path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-        search_regex: "Cluster is installed"
-        timeout: 7200
-      
-
-  - name: Try to complete failed cluster "{{ cluster_id }}" install
-    when:
-      - openshift_baremetal is not truthy(convert_bool=True)
-      - string_found.match_groups[0] == "level=fatal"
-    block:
-
-    - name: Get VM names of new cluster "{{ cluster_id }}" in vsphere folder "{{ vcenter_folder }}"
-      register: vm_list
-      vmware_vm_info:
-        hostname: "{{ vcenter_url }}"
-        username: "{{ vcenter_username }}"
-        password: "{{ vcenter_password }}"
-        folder: "{{ vcenter_folder }}"
-
-    - name: loop over every VM in the cluster, one by one and execute include_tasks
-      vars:
-        hard_power_off: yes
-      when:
-        - openshift_baremetal is not truthy(convert_bool=True)
-        - ' "-worker-" in item '
-        - ' cluster_id in item '
-        - ' infrastructure_id.stdout in item '
-      loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
-      include_tasks: poweroff_VM.yaml
-
-    - name: loop over every VM in the cluster, one by one and execute include_tasks
-      vars:
-        hard_power_off: yes
-      when:
-        - openshift_baremetal is not truthy(convert_bool=True)
-        - ' "-master-" in item '
-        - ' cluster_id in item '
-        - ' infrastructure_id.stdout in item '
-      loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
-      include_tasks: poweroff_VM.yaml
-
-    - name: loop over every VM in the cluster, one by one and execute include_tasks
-      vars:
-        no_wait: yes 
-      when:
-        - openshift_baremetal is not truthy(convert_bool=True)
-        - ' "-master-" in item '
-        - ' cluster_id in item '
-        - ' infrastructure_id.stdout in item '
-      loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
-      include_tasks: poweron_VM.yaml
-
-    - name: loop over every VM in the cluster, one by one and execute include_tasks
-      vars:
-        no_wait: yes 
-      when:
-        - openshift_baremetal is not truthy(convert_bool=True)
-        - ' "-worker-" in item '
-        - ' cluster_id in item '
-        - ' infrastructure_id.stdout in item '
-      loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
-      include_tasks: poweron_VM.yaml
- 
-    - name: Try to complete failed installation
-      become: true
-      async: 2700
-      poll: 0
-      shell: "{{ openshift_install_directory }}/openshift-install wait-for install-complete --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
-
-    - name: Waiting until "{{ lookup('pipe', 'date -d "+30 minutes" +"%R"') }}" for the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing
-      become: true
-      register: string_found
-      wait_for:
-        path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-        search_regex: (kubeadmin|level=fatal)
-        timeout: 1800
-
-
   - name: Get kubeadmin password from log file
     become: true
     register: kubeadmin_password
