@@ -6,14 +6,14 @@
 - name: Download {{ item }} version {{ openshift_version }}
   when: cachefile.stat.exists == False
   become: true
+  environment:
+    https_proxy: "{{ openshift_proxy }}"
   get_url:
     url: "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ openshift_version }}/{{ item }}-{{ openshift_version}}.tar.gz"
     force: true # if previous download failed
     checksum: "sha256:https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ openshift_version }}/sha256sum.txt"
     use_proxy: yes
     dest: "{{ openshift_install_directory }}"
-  environment:
-    https_proxy: "{{ openshift_proxy }}"
 
 - name: Mark file for further runs as successfully downloaded by changing its name
   when: cachefile.stat.exists == False

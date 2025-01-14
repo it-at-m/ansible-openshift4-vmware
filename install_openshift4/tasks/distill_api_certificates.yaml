@@ -17,8 +17,8 @@
   environment:
     PATH_TO_KUBECONF: "{{ openshift_install_directory }}/{{cluster_id}}/auth/kubeconfig"
   become: true
-  shell: 'grep certificate-authority-data: "$PATH_TO_KUBECONF" | cut -d ":" -f 2 | tr -d " " | base64 -d'
   register: api_certificates
+  shell: 'grep certificate-authority-data: "$PATH_TO_KUBECONF" | cut -d ":" -f 2 | tr -d " " | base64 -d'
 
 - name: Write api certificates to "{{ api_certificate_path }}"
   copy:

@@ -13,12 +13,12 @@
   
   - name: Extract install files tar.gz into {{ openshift_install_directory }}
     become: true
-    unarchive:
-      src: "{{ item }}"
-      dest: "{{ openshift_install_directory }}"
     loop:
       - "{{ openshift_install_directory }}/cached_openshift-client-linux-{{ openshift_version}}.tar.gz"
       - "{{ openshift_install_directory }}/cached_openshift-install-linux-{{ openshift_version}}.tar.gz"
+    unarchive:
+      src: "{{ item }}"
+      dest: "{{ openshift_install_directory }}"
 
   - name: Set symlink to extracted oc binary
     become: true
@@ -37,8 +37,8 @@
 
 
   - name: Read oc bashcompletions
-    shell: oc completion bash
     register: oc_bash_completion
+    shell: oc completion bash
 
   - name: Write oc bashcompletions
     become: true
@@ -51,13 +51,13 @@
 
   rescue:
     - name: Pause for 10 seconds before retry
+      when: retry_counter|int < include_max|default(3)|int
       pause:
         seconds: 10
-      when: retry_counter|int < include_max|default(3)|int
 
-    - include_tasks: main.yaml
-      when: retry_counter|int < include_max|default(3)|int
+    - when: retry_counter|int < include_max|default(3)|int
+      include_tasks: main.yaml
       
-    - fail:
+    - when: retry_counter|int >= include_max|default(3)|int
+      fail:
         msg: Failed to meet conditional
-      when: retry_counter|int >= include_max|default(3)|int

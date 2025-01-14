@@ -1,4 +1,7 @@
 - name: Power on VM "{{ item }}" and wait for ip
+  when: 
+    - no_wait is undefined
+    - ' "rhcos" not in item '
   vmware_guest:
     hostname: "{{ vcenter_url }}"
     username: "{{ vcenter_username }}"
@@ -8,11 +11,11 @@
     state: poweredon
     state_change_timeout: 60
     wait_for_ip_address: true
-  when: 
-    - no_wait is undefined
-    - ' "rhcos" not in item '
 
 - name: Power on VM "{{ item }}"
+  when: 
+    - no_wait is defined
+    - ' "rhcos" not in item '
   vmware_guest:
     hostname: "{{ vcenter_url }}"
     username: "{{ vcenter_username }}"
@@ -21,6 +24,3 @@
     name: "{{ item }}"
     state: poweredon
     state_change_timeout: 60
-  when: 
-    - no_wait is defined
-    - ' "rhcos" not in item '

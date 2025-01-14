@@ -1,4 +1,6 @@
 - name: Change rhcos template to VM
+  when:
+    - ' "rhcos" in item|string '
   vmware_guest:
     hostname: "{{ vcenter_url }}"
     username: "{{ vcenter_username }}"
@@ -7,8 +9,6 @@
     datastore: "{{ vcenter_defaultDatastore }}"
     cluster: "{{ vcenter_cluster }}"
     name: "{{ item }}"
-  when:
-    - ' "rhcos" in item|string '
 
 - name: Set VM hardware version to {{ vm_hardware_version }}
   vmware_guest:
@@ -42,11 +42,11 @@
         value: "True"
 
 - name: Change VM rhcos back to template
+  when:
+    - ' "rhcos" in item|string '
   vmware_guest:
     hostname: "{{ vcenter_url }}"
     username: "{{ vcenter_username }}"
     password: "{{ vcenter_password }}"
     name: "{{ item }}"
     is_template: yes
-  when:
-    - ' "rhcos" in item|string '
