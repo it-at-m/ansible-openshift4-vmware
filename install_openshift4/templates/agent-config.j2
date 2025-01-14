@@ -7,6 +7,8 @@ hosts:
 {%- for server in baremetal_server %}
   - hostname: {{ server.hostname }}
     role: {{ server.role }}
+    rootDeviceHints:
+      {{ server.rootDeviceHints }}
     interfaces:
       {%- for interface in server.interfaces %}
       - name: {{ interface.name }}
