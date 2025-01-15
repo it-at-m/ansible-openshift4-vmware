@@ -45,7 +45,12 @@ networking:
     hostPrefix: {{ cluster_network_hostprefix }}
   machineNetwork:
   - cidr: {{ machine_network }}
+    openshift_sdn_network: true
+  {%- if openshift_sdn_network is truthy(convert_bool=True) %}
+  networkType: OpenShiftSDN
+  {%- else %}
   networkType: OVNKubernetes
+  {%- endif %}
   serviceNetwork:
   - {{ service_network }}
 proxy:
@@ -67,6 +72,7 @@ platform:
       - {{ vcenter_apiVIP }}
     ingressVIPs:
       - {{ vcenter_ingressVIP }}
+    {%- if openshift_sdn_network is not truthy(convert_bool=True) %}
     hosts:
     - role: bootstrap
       networkDevice:
@@ -110,6 +116,7 @@ platform:
         - {{ static_ip['worker-2'] }}
         gateway: {{ openshift_gateway }}
         nameservers: {{ openshift_nameservers }}
+    {%- endif %}
     failureDomains:
     - name: OpenShift_MIA
       region: {{ vcenter_region }}
