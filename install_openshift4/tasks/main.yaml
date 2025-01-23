@@ -171,7 +171,24 @@
       - 99-master-chrony.yaml
     loop_control:
       loop_var: config_file
-    when: openshift_sdn_network == false
+    when: 
+      - openshift_sdn_network == false
+      - openshift_baremetal is not truthy(convert_bool=True)
+    copy:
+      src: "{{ config_file }}"
+      dest: "{{ openshift_install_directory }}/{{ cluster_id }}/openshift/{{ config_file }}"
+      owner: root
+      group: "{{ file_group }}"
+      mode: '0660'
+  
+  - name: Copy cluster configuration files to install openshift for baremetal install
+    become: true
+    loop:
+      - 99-master-chrony.yaml
+      - 99-worker-chrony.yaml
+    loop_control:
+      loop_var: config_file
+    when: openshift_baremetal is truthy(convert_bool=True)
     copy:
       src: "{{ config_file }}"
       dest: "{{ openshift_install_directory }}/{{ cluster_id }}/openshift/{{ config_file }}"
