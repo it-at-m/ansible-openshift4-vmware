@@ -1,5 +1,14 @@
-﻿- name: Download oc
+﻿- name: Check openshift installer version
+  shell: "{{ openshift_install_directory }}/openshift-install version | grep 'openshift-install' | cut -d' ' -f2"
+  register: openshift_installer_check_result
+
+- name: Check openshift client version
+  shell: "oc version | grep 'Client Version' | cut -d ':' -f2 | xargs"
+  register: openshift_client_check_result
+
+- name: Download oc
   tags: download_oc
+  when: openshift_version != openshift_installer_check_result.stdout or openshift_version != openshift_client_check_result.stdout
   block:
   - set_fact:
       retry_counter: "{{ retry_counter|default(0)|int + 1 }}"
@@ -13,12 +22,12 @@
   
   - name: Extract install files tar.gz into {{ openshift_install_directory }}
     become: true
-    unarchive:
-      src: "{{ item }}"
-      dest: "{{ openshift_install_directory }}"
     loop:
       - "{{ openshift_install_directory }}/cached_openshift-client-linux-{{ openshift_version}}.tar.gz"
       - "{{ openshift_install_directory }}/cached_openshift-install-linux-{{ openshift_version}}.tar.gz"
+    unarchive:
+      src: "{{ item }}"
+      dest: "{{ openshift_install_directory }}"
 
   - name: Set symlink to extracted oc binary
     become: true
@@ -37,8 +46,8 @@
 
 
   - name: Read oc bashcompletions
-    shell: oc completion bash
     register: oc_bash_completion
+    shell: oc completion bash
 
   - name: Write oc bashcompletions
     become: true
@@ -51,13 +60,13 @@
 
   rescue:
     - name: Pause for 10 seconds before retry
+      when: retry_counter|int < include_max|default(3)|int
       pause:
         seconds: 10
-      when: retry_counter|int < include_max|default(3)|int
 
-    - include_tasks: main.yaml
-      when: retry_counter|int < include_max|default(3)|int
+    - when: retry_counter|int < include_max|default(3)|int
+      include_tasks: main.yaml
       
-    - fail:
+    - when: retry_counter|int >= include_max|default(3)|int
+      fail:
         msg: Failed to meet conditional
-      when: retry_counter|int >= include_max|default(3)|int

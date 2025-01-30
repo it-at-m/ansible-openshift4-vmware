@@ -1,0 +1,32 @@
+- name: wait to boot server from iso
+  pause:
+    prompt: "Boot Server with created {{ openshift_install_directory }}/{{ cluster_id }}/agent.x86_64.iso, then press any key to continue"
+    echo: yes
+
+- name: Start wait for new baremetal cluster "{{ cluster_id }}" to install-complete
+  become: true
+  async: 5400
+  poll: 0
+  shell: "{{ openshift_install_directory }}/openshift-install agent wait-for install-complete --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
+
+- name: Waiting up to 2 hour for bootstrap to complete (until "{{ lookup('pipe', 'date -d "+2 hours" +"%R"') }}" )
+  become: true
+  wait_for:
+    path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+    search_regex: "Bootstrap is complete"
+    timeout: 7200
+
+- name: Waiting up to 2 hours for cluster to install (until "{{ lookup('pipe', 'date -d "+2 hours" +"%R"') }}" )
+  become: true
+  wait_for:
+    path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+    search_regex: "Cluster is installed"
+    timeout: 7200
+
+- name: Waiting until "{{ lookup('pipe', 'date -d "+30 minutes" +"%R"') }}" for the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing
+  become: true
+  register: string_found
+  wait_for:
+    path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
+    search_regex: (kubeadmin|level=fatal)
+    timeout: 1800

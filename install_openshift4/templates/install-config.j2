@@ -4,26 +4,38 @@ compute:
 - architecture: amd64
   hyperthreading: Enabled
   name: worker
-  replicas: {{ openshift_install_worker }}
+  {%- if openshift_sno is truthy(convert_bool=True) or openshift_compact_cluster is truthy(convert_bool=True) %}
+  replicas: 0
+  {%- else %}
+  replicas: 3
+  {%- endif %}
+  {%- if openshift_baremetal is not truthy(convert_bool=True) %}
   platform:
-    vsphere: 
-      cpus: {{ worker_cpus }}
+    vsphere:
+      cpus: 8
       coresPerSocket: 2
-      memoryMB: {{ worker_memoryMB }}
+      memoryMB: 16384
       osDisk:
         diskSizeGB: 120
+  {%- endif %}
 controlPlane:
   architecture: amd64
   hyperthreading: Enabled
   name: master
+  {%- if openshift_sno is truthy(convert_bool=True) %}
+  replicas: 1
+  {%- else %}
   replicas: 3
+  {%- endif %}
+  {%- if openshift_baremetal is not truthy(convert_bool=True) %}
   platform:
-    vsphere: 
+    vsphere:
       cpus: {{ master_cpus }}
       coresPerSocket: 2
       memoryMB: {{ master_memoryMB }}
       osDisk:
         diskSizeGB: 120
+  {%- endif %}
 metadata:
   creationTimestamp: null
   name: {{ cluster_id }}
@@ -33,9 +45,12 @@ networking:
     hostPrefix: {{ cluster_network_hostprefix }}
   machineNetwork:
   - cidr: {{ machine_network }}
-{% if openshift_sdn_network %}
+    openshift_sdn_network: true
+  {%- if openshift_sdn_network is truthy(convert_bool=True) %}
   networkType: OpenShiftSDN
-{% endif %}
+  {%- else %}
+  networkType: OVNKubernetes
+  {%- endif %}
   serviceNetwork:
   - {{ service_network }}
 proxy:
@@ -43,15 +58,24 @@ proxy:
   httpsProxy: {{ openshift_proxy }}
   noProxy: {{ openshift_install_noProxy }}
 platform:
+  {%- if openshift_baremetal is truthy(convert_bool=True) and openshift_sno is not truthy(convert_bool=True) %}
+  baremetal:
+    apiVIPs:
+      - {{ vcenter_apiVIP }}
+    ingressVIPs:
+      - {{ vcenter_ingressVIP }}
+  {%- elif openshift_baremetal is truthy(convert_bool=True) and openshift_sno is truthy(convert_bool=True) %}
+  none: {}
+  {%- else %}
   vsphere:
     apiVIPs:
       - {{ vcenter_apiVIP }}
     ingressVIPs:
       - {{ vcenter_ingressVIP }}
-{% if openshift_sdn_network == false %}
+    {%- if openshift_sdn_network is not truthy(convert_bool=True) %}
     hosts:
     - role: bootstrap
-      networkDevice: 
+      networkDevice:
         ipAddrs:
         - {{ static_ip['bootstrap'] }}
         gateway: {{ openshift_gateway }}
@@ -92,7 +116,7 @@ platform:
         - {{ static_ip['worker-2'] }}
         gateway: {{ openshift_gateway }}
         nameservers: {{ openshift_nameservers }}
-{% endif %}
+    {%- endif %}
     failureDomains:
     - name: OpenShift_MIA
       region: {{ vcenter_region }}
@@ -104,7 +128,7 @@ platform:
         networks:
         - {{ vcenter_network }}
         folder: "{{ vcenter_folder }}"
-      zone: {{ vcenter_zone }} 
+      zone: {{ vcenter_zone }}
     vcenters:
     - datacenters:
       - {{ vcenter_datacenter }}
@@ -113,6 +137,7 @@ platform:
       server: {{ vcenter_url }}
       user: {{ vcenter_username }}
     diskType: thin
+  {%- endif %}
 pullSecret: {{ openshift_install_pullSecret }}
 sshKey: {{ sshKey }}
 additionalTrustBundle: |

@@ -1,9 +1,9 @@
-# loop over every VM and check if it exists in the vcenter and is in state "poweredOn"
-- include_tasks: check_vm_exists.yaml
+- name: loop over every VM and check if it exists in the vcenter and is in state "poweredOn"
   loop:
     - "{{ infrastructure_id.stdout }}-bootstrap"
   loop_control:
     loop_var: vm_name
+  include_tasks: check_vm_exists.yaml
 
 - name: Power off bootstrap VM "{{ infrastructure_id.stdout }}-bootstrap"
   vmware_guest:
@@ -13,28 +13,27 @@
     name: "{{ infrastructure_id.stdout }}-bootstrap"
     state: poweredoff
 
-# loop over every VM and check if it exists in the vcenter and is in state "poweredOn"
-- include_tasks: check_vm_exists.yaml
+- name: loop over every VM and check if it exists in the vcenter and is in state "poweredOn"
   loop:
     - "{{ infrastructure_id.stdout }}-master-0"
     - "{{ infrastructure_id.stdout }}-master-1"
     - "{{ infrastructure_id.stdout }}-master-2"
   loop_control:
     loop_var: vm_name
+  include_tasks: check_vm_exists.yaml
 
 - name: Get VM names of new cluster "{{ cluster_id }}" in vsphere folder "{{ vcenter_folder }}"
+  register: vm_list
   vmware_vm_info:
     hostname: "{{ vcenter_url }}"
     username: "{{ vcenter_username }}"
     password: "{{ vcenter_password }}"
     folder: "{{ vcenter_folder }}"
-  register: vm_list
 
 - set_fact:
     node_type: "{{ node_type | default('') }}"
 
-# loop over every VM in the cluster, one by one and execute include_tasks
-- include_tasks: poweroff_VM.yaml
+- name: Hard power off VMs with node type "{{ node_type }}"
   loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
   vars:
     hard_power_off: yes
@@ -42,8 +41,16 @@
     - ' node_type in item '
     - ' cluster_id in item '
     - ' infrastructure_id.stdout in item '
+  include_tasks: poweroff_VM.yaml
 
 - name: Change "{{ cluster_id }}" VMs mac address
+  when:
+    - ' cluster_id|string in item[0].guest_name '
+    - ' infrastructure_id.stdout in item[0].guest_name '
+    - ' item[1]|string in item[0].guest_name '
+  with_nested:
+    - "{{ vm_list.virtual_machines }}"
+    - [ 'bootstrap', 'master-0', 'master-1', 'master-2' ]
   vmware_guest_network:
     hostname: "{{ vcenter_url }}"
     username: "{{ vcenter_username }}"
@@ -52,24 +59,16 @@
     label: "Network adapter 1"
     mac_address: "{{ vcenter_mac_address[ item[1] ] }}"
     state: present
-  when:
-    - ' cluster_id|string in item[0].guest_name '
-    - ' infrastructure_id.stdout in item[0].guest_name '
-    - ' item[1]|string in item[0].guest_name '
-  with_nested:
-    - "{{ vm_list.virtual_machines }}"
-    - [ 'bootstrap', 'master-0', 'master-1', 'master-2' ]
 
-# loop over every VM in the cluster, one by one and execute include_tasks
-- include_tasks: set_VM_Options.yaml
+- name: Set VM options on node type "{{ node_type }}"
   loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
   when:
     - ' node_type in item '
     - ' cluster_id in item '
     - ' infrastructure_id.stdout in item '
+  include_tasks: set_VM_Options.yaml
 
-# loop over every VM in the cluster, one by one and execute include_tasks
-- include_tasks: poweron_VM.yaml
+- name: Power on VMs with node type "{{ node_type }}"
   loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
   vars:
     no_wait: yes
@@ -77,3 +76,4 @@
     - ' node_type in item '
     - ' cluster_id in item '
     - ' infrastructure_id.stdout in item '
+  include_tasks: poweron_VM.yaml

@@ -1,0 +1,47 @@
+- name: Get VM names of new cluster "{{ cluster_id }}" in vsphere folder "{{ vcenter_folder }}"
+  register: vm_list
+  vmware_vm_info:
+    hostname: "{{ vcenter_url }}"
+    username: "{{ vcenter_username }}"
+    password: "{{ vcenter_password }}"
+    folder: "{{ vcenter_folder }}"
+
+- name: Power off worker VMs
+  vars:
+    hard_power_off: yes
+  when:
+    - ' "-worker-" in item '
+    - ' cluster_id in item '
+    - ' infrastructure_id.stdout in item '
+  loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+  include_tasks: poweroff_VM.yaml
+
+- name: Power off master VMs
+  vars:
+    hard_power_off: yes
+  when:
+    - ' "-master-" in item '
+    - ' cluster_id in item '
+    - ' infrastructure_id.stdout in item '
+  loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+  include_tasks: poweroff_VM.yaml
+
+- name: Power on master VMs
+  vars:
+    no_wait: yes 
+  when:
+    - ' "-master-" in item '
+    - ' cluster_id in item '
+    - ' infrastructure_id.stdout in item '
+  loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+  include_tasks: poweron_VM.yaml
+
+- name: Power on worker VMs
+  vars:
+    no_wait: yes 
+  when:
+    - ' "-worker-" in item '
+    - ' cluster_id in item '
+    - ' infrastructure_id.stdout in item '
+  loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+  include_tasks: poweron_VM.yaml

@@ -1,0 +1,77 @@
+apiVersion: v1alpha1
+kind: AgentConfig
+metadata:
+  name: {{ cluster_id }}
+rendezvousIP: {{ baremetal_server[0].ip_address[0] }}
+hosts:
+{%- for server in baremetal_server %}
+  - hostname: {{ server.hostname }}
+    role: {{ server.role }}
+    rootDeviceHints:
+      {{ server.rootDeviceHints }}
+    interfaces:
+      {%- for interface in server.interfaces %}
+      - name: {{ interface.name }}
+        macAddress: {{ interface.macAddress }}
+      {%- endfor %}
+    networkConfig:
+      interfaces:
+        {%- if baremetal_vlan is not defined %}
+        - name: eth0
+          type: ethernet
+          state: up
+          mac-address: {{ server.interfaces[0].macAddress }}
+          ipv4:
+            enabled: true
+            address:
+            {%- for server_ip in server.ip_address %}
+              - ip: {{ server_ip }}
+                prefix-length: {{ machine_network_hostprefix }}
+            {%- endfor %}
+            dhcp: false
+        {%- else %}
+        - name: bond0.{{ baremetal_vlan }}
+          type: vlan
+          state: up
+          vlan:
+            base-iface: bond0
+            id: {{ baremetal_vlan }}
+          ipv4:
+            enabled: true
+            address:
+            {%- for server_ip in server.ip_address %}
+              - ip: {{ server_ip }}
+                prefix-length: {{ machine_network_hostprefix }}
+            {%- endfor %}
+            dhcp: false
+        - name: bond0
+          type: bond
+          state: up
+          mac-address: {{ server.interfaces[0].macAddress }}
+          ipv4:
+            enabled: false
+          ipv6:
+            enabled: false
+          link-aggregation:
+            mode: active-backup
+            options:
+              miimon: "150"
+            port:
+            {%- for interface in server.interfaces %}
+             - {{ interface.name }}
+            {%- endfor %}
+        {%- endif %}  
+      dns-resolver:
+        config:
+          server: {{ openshift_nameservers }}
+      routes:
+        config:
+          - destination: 0.0.0.0/0
+            next-hop-address: {{ openshift_gateway }}
+            {%- if baremetal_vlan is not defined %}
+            next-hop-interface: eth0
+            {%- else %}
+            next-hop-interface: bond0.{{ baremetal_vlan }}
+            {%- endif %}
+            table-id: 254
+{%- endfor %}
