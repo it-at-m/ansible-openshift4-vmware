@@ -61,7 +61,7 @@
     state: present
 
 - name: Set VM options on node type "{{ node_type }}"
-- loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+  loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
   when:
     - ' node_type in item '
     - ' cluster_id in item '
@@ -69,7 +69,7 @@
   include_tasks: set_VM_Options.yaml
 
 - name: Power on VMs with node type "{{ node_type }}"
-- loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
+  loop: "{{ vm_list.virtual_machines | json_query('[].guest_name') | flatten(1) }}"
   vars:
     no_wait: yes
   when:
