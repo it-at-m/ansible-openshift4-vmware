@@ -58,9 +58,9 @@
 - name: Remove existing configurations of baremetal cluster "{{ cluster_id }}"
   when:
     - stat_result.stat.exists
+    - openshift_baremetal is truthy(convert_bool=True)
     - remove_old_cluster_config is defined
     - remove_old_cluster_config.user_input | bool
-    - openshift_baremetal is truthy(convert_bool=True)
   block:
 
   - name: Remove old install directory "{{ cluster_id }}"
