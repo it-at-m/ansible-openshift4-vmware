@@ -1,5 +1,14 @@
-﻿- name: Download oc
+﻿- name: Check openshift installer version
+  shell: "{{ openshift_install_directory }}/openshift-install version | grep 'openshift-install' | cut -d' ' -f2"
+  register: openshift_installer_check_result
+
+- name: Check openshift client version
+  shell: "oc version | grep 'Client Version' | cut -d ':' -f2 | xargs"
+  register: openshift_client_check_result
+
+- name: Download oc
   tags: download_oc
+  when: openshift_version != openshift_installer_check_result.stdout or openshift_version != openshift_client_check_result.stdout
   block:
   - set_fact:
       retry_counter: "{{ retry_counter|default(0)|int + 1 }}"
