@@ -5,6 +5,10 @@ all:
     openshift_master_cluster_public_hostname: openshift.example.org
     openshift_master_default_subdomain: apps.example.org
     openshift_version: 4.13.15
+    openshift_baremetal: false
+    openshift_sno: false ## configure only 1 master node and 0 worker nodes
+    openshift_compact_cluster: false ## configure only 3 master nodes and 0 worker nodes
+    no_sealed_secret: true
     external_registry: registry.example.org
     cluster_id: example
     openshift_install_worker: 3
