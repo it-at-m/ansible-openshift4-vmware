@@ -222,6 +222,7 @@
       cmd: |
         grep kubeadmin "{{ openshift_install_directory }}/{{ cluster_id }}"/.openshift_install.log | cut -d'\' -f4 | sed s/\"// | tail -1
 
+  # Do not validate certs on baremetal clusters, because there is no ingress-certificate in the kubeconfig file
   - name: oc login to "{{ cluster_api }}" with user "kubeadmin"
     register: k8s_auth_results
     until: k8s_auth_results.k8s_auth.api_key is defined
@@ -232,6 +233,7 @@
       password: "{{ kubeadmin_password.stdout }}"
       host: "{{ cluster_api }}"
       ca_cert: "{{ api_certificate_path }}"
+      validate_certs: "{{ openshift_baremetal is not truthy(convert_bool=True)  }}"
 
   - name: set k8s_auth_api_key.user_input
     set_fact: 
