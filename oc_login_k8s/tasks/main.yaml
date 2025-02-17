@@ -3,6 +3,7 @@
     KUBECONFIG_EXPECTED: "{{ ansible_kubeconfig_path }}"
     # KUBECONFIG environment needs to be defined on the playbook level to apply globaly!
     # Do not define it here!
+  changed_when: false
   shell: |
     if [ "$KUBECONFIG" != "$KUBECONFIG_EXPECTED" ]; then
       echo "Unexpected KUBECONFIG definition!"
@@ -33,5 +34,6 @@
   when: token is defined
 
 - name: oc login, does not change the cluster
+  changed_when: false
   shell: |
     oc login --token={{ k8s_auth_api_key.user_input }} --server={{ cluster_api }} --certificate-authority={{ api_certificate_path }}
