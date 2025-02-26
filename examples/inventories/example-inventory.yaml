@@ -15,6 +15,7 @@ all:
     openshift_sdn_network: false
     no_sealed_secret: true
     master_cpus: 4
+    master_coresPerSocket: 2
     master_memoryMB: 16384
     worker_cpus: 4
     worker_memoryMB: 16384
