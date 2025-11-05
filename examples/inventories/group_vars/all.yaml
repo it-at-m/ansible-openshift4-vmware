@@ -49,6 +49,27 @@ openshift_install_pullSecret: >
       }
     }'
 
+openshift_install_pullSecret_dev: >
+    '{
+      "auths": {
+        "cloud.openshift.com": {
+          "auth": "{{ cloudopenshiftcom_quayio }}",
+          "email": "james.doe@example.org"
+        },
+        "quay.io": {
+          "auth": "{{ cloudopenshiftcom_quayio }}",
+          "email": "james.doe@example.org"
+        },
+        "registry.connect.redhat.com": {
+          "auth": "{{ registryconnectredhatcom_registryredhatio }}",
+          "email": "james.doe@example.org"
+        },
+        "registry.redhat.io": {
+          "auth": "{{ registryconnectredhatcom_registryredhatio }}",
+          "email": "james.doe@example.org"
+        }
+      }
+    }'
 
 # auth entry for registry.connect.redhat.com/registry.redhat.io pullsecret
 registryconnectredhatcom_registryredhatio: "b3Blb="

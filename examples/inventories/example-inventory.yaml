@@ -11,6 +11,7 @@ all:
     no_sealed_secret: true
     external_registry: registry.example.org
     cluster_id: example
+    git_revision: dev
     openshift_install_worker: 3
     openshift_sdn_network: false
     no_sealed_secret: true
