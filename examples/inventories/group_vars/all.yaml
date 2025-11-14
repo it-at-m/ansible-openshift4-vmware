@@ -10,6 +10,9 @@ openshift_nameservers:
   - 192.3.1.46
 openshift_install_directory: /opt/openshift4
 
+ntp_servers:
+  - 192.3.1.50
+  - 192.3.1.51
 
 vcenter_guestos: rhel9_64Guest
 vcenter_region: sued

@@ -3,6 +3,7 @@ kind: AgentConfig
 metadata:
   name: {{ cluster_id }}
 rendezvousIP: {{ baremetal_server[0].ip_address[0] }}
+additionalNTPSources: {{ ntp_servers }}
 hosts:
 {%- for server in baremetal_server %}
   - hostname: {{ server.hostname }}
