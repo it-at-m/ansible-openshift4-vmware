@@ -6,6 +6,7 @@ all:
     openshift_master_default_subdomain: apps.example.org
     openshift_version: 4.13.15
     openshift_baremetal: false
+    openshift_baremetal_platform: baremetal ## baremetal with OpenShift Loadbalancer, none for SNO Cluster or Cluster with external Loadbalancer
     openshift_sno: false ## configure only 1 master node and 0 worker nodes
     openshift_compact_cluster: false ## configure only 3 master nodes and 0 worker nodes
     no_sealed_secret: true
