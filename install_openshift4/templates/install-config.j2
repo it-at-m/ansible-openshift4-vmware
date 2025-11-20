@@ -57,13 +57,13 @@ proxy:
   httpsProxy: {{ openshift_proxy }}
   noProxy: {{ openshift_install_noProxy }}
 platform:
-  {%- if openshift_baremetal_platform == 'baremetal' %}
+  {%- if openshift_baremetal_platform is defined and openshift_baremetal_platform == 'baremetal' %}
   baremetal:
     apiVIPs:
       - {{ vcenter_apiVIP }}
     ingressVIPs:
       - {{ vcenter_ingressVIP }}
-  {%- elif openshift_baremetal_platform == 'none' %}
+  {%- elif openshift_baremetal_platform is defined and openshift_baremetal_platform == 'none' %}
   none: {}
   {%- else %}
   vsphere:
