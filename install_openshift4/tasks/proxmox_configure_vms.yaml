@@ -1,0 +1,81 @@
+- name: Mount ISO image on CD-ROM (create drive if missing) on all VMs
+  async: 180
+  poll: 0
+  loop: "{{ server_list }}"
+  loop_control:
+    loop_var: server
+    pause: 1
+  register: mount_iso_jobs
+  community.proxmox.proxmox_disk:
+    api_user: "{{ ldap_user }}"
+    api_password: "{{ ldap_password.user_input | trim }}"
+    api_host: "{{ proxmox_node }}.srv.muenchen.de"
+    api_port: 8006
+    name: "{{ server }}"
+    disk: ide2
+    media: cdrom
+    iso_image: '{{ proxmox_storage }}:iso/agent.x86_64.iso'
+    state: present
+
+- name: Change boot order on VMs
+  async: 180
+  poll: 0
+  loop: "{{ server_list }}"
+  loop_control:
+    loop_var: server
+    pause: 1
+  register: change_boot_order_jobs
+  community.proxmox.proxmox_kvm:
+    api_user: "{{ ldap_user }}"
+    api_password: "{{ ldap_password.user_input | trim }}"
+    api_host: "{{ proxmox_node }}.srv.muenchen.de"
+    api_port: 8006
+    name: "{{ server }}"
+    node: "{{ proxmox_node }}"
+    pool: "{{ proxmox_pool }}"
+    update: true
+    boot: 'order=virtio0;ide2;net0'
+
+- name: Wait for mount iso jobs to complete
+  loop: "{{ mount_iso_jobs.results }}"
+  register: job_results
+  until: job_results.finished
+  retries: 120
+  delay: 5
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"
+
+- name: Wait for change boot order jobs to complete
+  loop: "{{ change_boot_order_jobs.results }}"
+  register: job_results
+  until: job_results.finished
+  retries: 120
+  delay: 5
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"
+
+- name: Boot VMs
+  async: 180
+  poll: 0
+  loop: "{{ server_list }}"
+  loop_control:
+    loop_var: server
+    pause: 1
+  register: boot_vms_jobs
+  community.proxmox.proxmox_kvm:
+    api_user: "{{ ldap_user }}"
+    api_password: "{{ ldap_password.user_input | trim }}"
+    api_host: "{{ proxmox_node }}.srv.muenchen.de"
+    api_port: 8006
+    name: "{{ server }}"
+    node: "{{ proxmox_node }}"
+    state: started
+
+- name: Wait for boot VMs jobs to complete
+  loop: "{{ boot_vms_jobs.results }}"
+  register: job_results
+  until: job_results.finished
+  retries: 120
+  delay: 5
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"

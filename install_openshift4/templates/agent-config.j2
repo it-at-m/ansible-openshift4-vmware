@@ -17,7 +17,7 @@ hosts:
       {%- endfor %}
     networkConfig:
       interfaces:
-        {%- if baremetal_vlan is not defined %}
+        {%- if baremetal_configure_vlan_bond is not truthy(convert_bool=True) %}
         - name: eth0
           type: ethernet
           state: up
@@ -69,7 +69,7 @@ hosts:
         config:
           - destination: 0.0.0.0/0
             next-hop-address: {{ openshift_gateway }}
-            {%- if baremetal_vlan is not defined %}
+            {%- if baremetal_configure_vlan_bond is not truthy(convert_bool=True) %}
             next-hop-interface: eth0
             {%- else %}
             next-hop-interface: bond0.{{ baremetal_vlan }}

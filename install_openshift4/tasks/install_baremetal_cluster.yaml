@@ -1,7 +1,60 @@
 - name: wait to boot server from iso
+  when: openshift_proxmox != true
   pause:
     prompt: "Boot Server with created {{ openshift_install_directory }}/{{ cluster_id }}/agent.x86_64.iso, then press any key to continue"
     echo: yes
+
+- name: Upload iso to proxmox datastore
+  when: openshift_proxmox == true
+  pause:
+    prompt: |
+
+      Upload iso in dima-admin with WinSCP from ocpbastionp001:{{ openshift_install_directory }}/{{ cluster_id }}/agent.x86_64.iso to Downloads folder.
+
+      Upload agent.x86_64.iso to proxmox https://{{ proxmox_node_a20 }}.srv.muenchen.de:8006/#v1:0:=storage%2F{{ proxmox_node_a20 }}%2F{{ proxmox_storage }}:4::=contentIso::::: from Downloads folder.
+
+      Press any key to continue
+    echo: yes
+
+- name: Get list odf servers in a20
+  loop: "{{ baremetal_server }}"
+  loop_control:
+    loop_var: server
+  vars:
+    server_list_a20: []
+  when:
+    - '"-a20-" in server.hostname or "-master-0" in server.hostname or "-master-1" in server.hostname'
+  set_fact:
+    server_list_a20: "{{ server_list_a20 + [server.hostname] }}"
+
+- name: configure proxmox a20 VMs to boot from iso
+  vars:
+    server_list: "{{ server_list_a20 }}"
+    proxmox_node: "{{ proxmox_node_a20 }}"
+  when: 
+    - openshift_proxmox == true
+  include_tasks:
+    file: proxmox_configure_vms.yaml
+
+- name: Get list odf servers in k30
+  loop: "{{ baremetal_server }}"
+  loop_control:
+    loop_var: server
+  vars:
+    server_list_k30: []
+  when:
+    - '"-k30-" in server.hostname or "-master-2" in server.hostname'
+  set_fact:
+    server_list_k30: "{{ server_list_k30 + [server.hostname] }}"
+
+- name: configure proxmox k30 VMs to boot from iso
+  vars:
+    server_list: "{{ server_list_k30 }}"
+    proxmox_node: "{{ proxmox_node_k30 }}"
+  when: 
+    - openshift_proxmox == true
+  include_tasks:
+    file: proxmox_configure_vms.yaml
 
 - name: Start wait for new baremetal cluster "{{ cluster_id }}" to install-complete
   become: true
