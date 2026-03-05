@@ -34,6 +34,7 @@
     node: "{{ proxmox_node }}"
     pool: "{{ proxmox_pool }}"
     update: true
+    agent: true
     boot: 'order=virtio0;ide2;net0'
 
 - name: Wait for mount iso jobs to complete
