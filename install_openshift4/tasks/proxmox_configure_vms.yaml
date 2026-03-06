@@ -37,6 +37,44 @@
     agent: true
     boot: 'order=scsi0;ide2;net0'
 
+- name: Set disk options scsi0
+  async: 180
+  poll: 0
+  loop: "{{ server_list }}"
+  loop_control:
+    loop_var: server
+    pause: 1
+  register: change_disk_scsi0
+  community.proxmox.proxmox_disk:
+    api_user: "{{ ldap_user }}"
+    api_password: "{{ ldap_password.user_input | trim }}"
+    api_host: "{{ proxmox_node }}.srv.muenchen.de"
+    api_port: 8006
+    name: "{{ server }}"
+    disk: "scsi0"
+    iothread: true
+    discard: "on"
+    state: present
+
+- name: Set disk options scsi1
+  async: 180
+  poll: 0
+  loop: "{{ server_list }}"
+  loop_control:
+    loop_var: server
+    pause: 1
+  register: change_disk_scsi1
+  community.proxmox.proxmox_disk:
+    api_user: "{{ ldap_user }}"
+    api_password: "{{ ldap_password.user_input | trim }}"
+    api_host: "{{ proxmox_node }}.srv.muenchen.de"
+    api_port: 8006
+    name: "{{ server }}"
+    disk: "scsi1"
+    iothread: true
+    discard: "on"
+    state: present
+
 - name: Wait for mount iso jobs to complete
   loop: "{{ mount_iso_jobs.results }}"
   register: job_results
@@ -48,6 +86,24 @@
 
 - name: Wait for change boot order jobs to complete
   loop: "{{ change_boot_order_jobs.results }}"
+  register: job_results
+  until: job_results.finished
+  retries: 120
+  delay: 5
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"
+
+- name: Wait for change disk scsi0 jobs to complete
+  loop: "{{ change_disk_scsi0.results }}"
+  register: job_results
+  until: job_results.finished
+  retries: 120
+  delay: 5
+  ansible.builtin.async_status:
+    jid: "{{ item.ansible_job_id }}"
+
+- name: Wait for change disk scsi1 jobs to complete
+  loop: "{{ change_disk_scsi1.results }}"
   register: job_results
   until: job_results.finished
   retries: 120
