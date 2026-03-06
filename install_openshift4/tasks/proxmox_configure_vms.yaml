@@ -35,7 +35,7 @@
     pool: "{{ proxmox_pool }}"
     update: true
     agent: true
-    boot: 'order=virtio0;ide2;net0'
+    boot: 'order=scsi0;ide2;net0'
 
 - name: Wait for mount iso jobs to complete
   loop: "{{ mount_iso_jobs.results }}"
