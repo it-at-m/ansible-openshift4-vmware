@@ -16,6 +16,7 @@
     media: cdrom
     iso_image: '{{ proxmox_storage }}:iso/agent.x86_64.iso'
     state: present
+    validate_certs: false
 
 - name: Change boot order on VMs
   async: 180
@@ -36,6 +37,7 @@
     update: true
     agent: true
     boot: 'order=scsi0;ide2;net0'
+    validate_certs: false
 
 - name: Set disk options scsi0
   async: 180
@@ -55,6 +57,7 @@
     iothread: true
     discard: "on"
     state: present
+    validate_certs: false
 
 - name: Set disk options scsi1
   async: 180
@@ -74,6 +77,7 @@
     iothread: true
     discard: "on"
     state: present
+    validate_certs: false
 
 - name: Wait for mount iso jobs to complete
   loop: "{{ mount_iso_jobs.results }}"
@@ -127,6 +131,7 @@
     name: "{{ server }}"
     node: "{{ proxmox_node }}"
     state: started
+    validate_certs: false
 
 - name: Wait for boot VMs jobs to complete
   loop: "{{ boot_vms_jobs.results }}"
