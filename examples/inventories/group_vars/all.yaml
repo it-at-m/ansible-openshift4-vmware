@@ -22,6 +22,12 @@ vm_hardware_version: 19
 openshift_backup_path: /opt/backup
 api_certificate_path: /opt/api_certificates/{{ cluster_id }}
 
+# Root CA used for custom api certificates.
+api_custom_root_ca: |
+    -----BEGIN CERTIFICATE-----
+    yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy
+    -----END CERTIFICATE-----
+
 # additional trusted CAs must be stored in .pem
 openshift_install_additionalTrustBundle: |
     -----BEGIN CERTIFICATE-----

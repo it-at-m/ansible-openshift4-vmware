@@ -22,5 +22,5 @@
 
 - name: Write api certificates to "{{ api_certificate_path }}"
   copy:
-    content: "{{ api_certificates.stdout }}"
+    content: "{{ api_certificates.stdout + \"\n\" + api_custom_root_ca }}"
     dest: "{{ api_certificate_path }}"
