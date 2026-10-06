@@ -58,7 +58,7 @@
 
 - name: Start wait for new baremetal cluster "{{ cluster_id }}" to install-complete
   become: true
-  async: 9000
+  async: 5400
   poll: 0
   shell: "{{ openshift_install_directory }}/openshift-install agent wait-for install-complete --dir={{ openshift_install_directory }}/{{ cluster_id }} --log-level=info"
 

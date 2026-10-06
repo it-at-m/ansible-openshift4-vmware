@@ -223,7 +223,7 @@
   - name: Create new baremetal iso for cluster "{{ cluster_id }}"
     become: true
     environment:
-      https_proxy: "{{ local_proxy }}"
+      https_proxy: "{{ openshift_proxy }}"
       TMPDIR: "/opt/lhm/cap"
     when: openshift_baremetal is truthy(convert_bool=True)
     register: openshift4_install

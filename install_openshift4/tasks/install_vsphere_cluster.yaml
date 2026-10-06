@@ -55,7 +55,7 @@
     - name: Download vsphere image "{{ vsphere_image_url.stdout }}"
       become: true
       environment:
-        https_proxy: "{{ local_proxy }}"
+        https_proxy: "{{ openshift_proxy }}"
       get_url:
         url: "{{ vsphere_image_url.stdout }}"
         force: true # if previous download failed
