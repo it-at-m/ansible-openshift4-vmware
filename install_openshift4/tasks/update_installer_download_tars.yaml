@@ -7,7 +7,7 @@
   when: cachefile.stat.exists == False
   become: true
   environment:
-    https_proxy: "{{ openshift_proxy }}"
+    https_proxy: "{{ local_proxy }}"
   get_url:
     url: "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/{{ openshift_version }}/{{ item }}-{{ openshift_version}}.tar.gz"
     force: true # if previous download failed

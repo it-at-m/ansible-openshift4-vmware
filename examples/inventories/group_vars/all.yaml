@@ -5,6 +5,7 @@ ansible_kubeconfig_path: "{{ lookup('ansible.builtin.env', 'HOME') }}/.kube/ansi
 file_group: ateam
 
 openshift_proxy: http://192.0.2.100:80
+local_proxy: http://192.2.1.100:80
 openshift_nameservers: 
   - 192.3.1.45
   - 192.3.1.46
