@@ -15,10 +15,12 @@ hosts:
       - name: {{ interface.name }}
         macAddress: {{ interface.macAddress }}
       {%- endfor %}
+      {%- if server.storage_interfaces is defined %}
       {%- for interface in server.storage_interfaces %}
       - name: {{ interface.name }}
         macAddress: {{ interface.macAddress }}
       {%- endfor %}
+      {%- endif %}
     networkConfig:
       interfaces:
         {%- if baremetal_configure_vlan_bond is not truthy(convert_bool=True) %}
