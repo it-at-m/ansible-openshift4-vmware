@@ -129,8 +129,8 @@ hosts:
             {%- endif %}
             table-id: 254
           {%- if server.storage_interfaces is defined %}
-          - destination: 0.0.0.0/0
-            next-hop-address: {{ openshift_gateway }}
+          - destination: {{ storage_network }}
+            next-hop-address: {{ storage_gateway }}
             {%- if baremetal_configure_vlan_bond is not truthy(convert_bool=True) %}
             next-hop-interface: eth1
             {%- else %}
