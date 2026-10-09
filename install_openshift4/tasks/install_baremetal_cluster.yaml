@@ -73,7 +73,7 @@
   become: true
   wait_for:
     path: "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log"
-    search_regex: "Cluster is installed"
+    search_regex: "Install complete"
     timeout: 7200
 
 - name: Waiting until "{{ lookup('pipe', 'date -d "+30 minutes" +"%R"') }}" for the string "kubeadmin" or "level=fatal" is in the log file "{{ openshift_install_directory }}/{{ cluster_id }}/.openshift_install.log" before continuing
