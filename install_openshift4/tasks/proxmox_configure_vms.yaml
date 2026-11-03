@@ -14,7 +14,7 @@
     name: "{{ server }}"
     disk: ide2
     media: cdrom
-    iso_image: '{{ proxmox_storage }}:iso/agent.x86_64.iso'
+    iso_image: '{{ proxmox_storage }}:iso/{{ iso_name }}'
     state: present
     validate_certs: false
 

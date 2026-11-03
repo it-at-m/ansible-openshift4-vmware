@@ -31,6 +31,7 @@
   vars:
     server_list: "{{ server_list_a20 }}"
     proxmox_node: "{{ proxmox_node_a20 }}"
+    iso_name: "agent.x86_64.iso"
   when: 
     - openshift_proxmox == true
   include_tasks:
@@ -51,6 +52,7 @@
   vars:
     server_list: "{{ server_list_k30 }}"
     proxmox_node: "{{ proxmox_node_k30 }}"
+    iso_name: "agent.x86_64.iso"
   when: 
     - openshift_proxmox == true
   include_tasks:
